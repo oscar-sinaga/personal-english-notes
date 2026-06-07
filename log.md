@@ -74,6 +74,7 @@ Semua artefak proyek + di mana state disimpan, agar bisa dilacak dari satu tempa
 |---------|--------|-----|
 | **log.md** (file ini) | root proyek | Tracking utama: state, keputusan, next steps |
 | guideline_token_efficiency.md | root proyek | Aturan hemat token |
+| reusable_setup_prompt.md | root proyek | Prompt siap-pakai untuk setup proyek baru yang sama |
 | `.venv/` | root proyek | Python 3.13.12 environment (uv) |
 | Memory: `follow-token-efficiency-guideline.md` | `~/.claude/projects/d--ai-agent-echancement-Belajar-bahasa-inggris/memory/` (tersembunyi) | Preferensi durable hemat token — auto-load tiap sesi |
 | MEMORY.md (index) | folder memory di atas | Daftar pointer semua memory |
@@ -108,7 +109,9 @@ Format commit: `YYYY-MM-DD | <task> | <git commit hash>`
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
-| 2026-06-07 ~17:30 | Setup awal: diskusi versi Python, buat uv venv Python 3.13.12, buat log.md, adopsi token efficiency guideline, init git repo | `50285b3` | ✅ Done |
+| 2026-06-07 21:16 | Setup awal: diskusi versi Python, buat uv venv Python 3.13.12, buat log.md, adopsi token efficiency guideline, init git repo | `50285b3` | ✅ Done |
+| 2026-06-07 21:17 | Update git email + tambah kolom waktu (HH:MM) di session log | `22472c1` | ✅ Done |
+| 2026-06-07 21:19 | Buat `reusable_setup_prompt.md` (prompt setup untuk proyek lain) | _(pending commit)_ | ✅ Done |
 
 > Tiap sesi baru atau task selesai: tambah baris di tabel ini via `Edit` (diff), lalu `git commit`. Format waktu: `YYYY-MM-DD HH:MM`.
 
