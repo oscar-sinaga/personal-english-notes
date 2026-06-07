@@ -60,7 +60,8 @@ LAKUKAN HAL BERIKUT:
 6. ATURAN KERJA BERKELANJUTAN
    - Tiap sesi/task selesai → tambah baris di Session & Task Log (tanggal+jam) → `git commit` → catat hash-nya.
    - Setiap GANTI agent/model/tipe/mode (mis. pindah ke Gemini/GPT, ganti versi model, fast mode) → tambah baris di "Riwayat Perubahan Agent & Model" dengan waktu nyata. Agent yang baru ambil alih WAJIB menulis baris identitasnya sendiri.
-   - Update `log.md` via edit (diff), bukan tulis ulang.
+   - Update `log.md`/`context.md` via edit (diff), bukan tulis ulang.
+   - Footer "Terakhir diperbarui" di `context.md` & `log.md` selalu pakai **tanggal + jam** (`YYYY-MM-DD HH:MM`), perbarui tiap kali file diubah.
    - Info yang melewati knowledge cutoff (mis. versi software terbaru) → CEK INTERNET, jangan dari ingatan.
 
 Setelah selesai, konfirmasi dengan ringkasan singkat (jangan paste isi file panjang ke chat).
