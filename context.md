@@ -47,6 +47,7 @@ Setup environment Python untuk proyek (folder "Belajar bahasa inggris" — kemun
 - Cara aktivasi: `.venv\Scripts\activate`
 - Belum ada dependency/package yang diinstall.
 - **Berhasil mengekstrak 3 riwayat chat ke folder `materi_bahasa_inggris/`**.
+- **Fokus Saat Ini**: Memulai sesi *Active English Learning* tanpa membuat aplikasi web terlebih dahulu. Rencana aplikasi disimpan di `.gemini/antigravity-ide/brain/` sebagai artefak.
 
 ---
 
@@ -68,9 +69,8 @@ Setup environment Python untuk proyek (folder "Belajar bahasa inggris" — kemun
 
 ## 📝 Next Steps (Saran Lanjutan)
 
-- [ ] Aktifkan venv: `.venv\Scripts\activate`
-- [ ] Tentukan dependency awal proyek (mis. `uv pip install <package>`) atau buat `pyproject.toml`.
-- [ ] Tentukan struktur proyek "Belajar bahasa inggris" (tujuan & fitur).
+- [ ] Memulai sesi latihan pertama (Active Writing / Speaking) berdasarkan materi *Credit Intelligence & Modelling*.
+- [ ] Menyusun target harian/mingguan yang spesifik untuk simulasi roleplay.
 
 ---
 
@@ -97,4 +97,4 @@ Setup environment Python untuk proyek (folder "Belajar bahasa inggris" — kemun
 
 ---
 
-*Terakhir diperbarui: 2026-06-07 22:45*
+*Terakhir diperbarui: 2026-06-07 22:54*
