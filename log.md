@@ -33,17 +33,17 @@
 
 ### 🔄 Riwayat Perubahan Agent & Model (Change Log)
 
-> **WAJIB:** setiap kali ganti agent (Claude/Gemini/GPT), ganti model/versi, ganti tipe, atau ganti mode/effort (mis. fast `[1m]`, thinking) → **tambah satu baris** di tabel ini dengan **waktu nyata** (`Get-Date`/`date`/`git log`, jangan nebak). Agent yang baru ambil alih wajib menulis baris identitasnya sendiri.
+> **WAJIB:** setiap kali ganti agent (Claude/Gemini/GPT), ganti model/versi, ganti tipe, atau ganti mode/effort (mis. fast `[1m]`, thinking) → **tambah satu baris di PALING ATAS** tabel ini (terbaru di atas) dengan **waktu nyata** (`Get-Date`/`date`/`git log`, jangan nebak). Agent yang baru ambil alih wajib menulis baris identitasnya sendiri.
 
 | Waktu | Agent / Platform | Model | Mode / Effort | Catatan |
 |-------|------------------|-------|---------------|---------|
-| ~awal sesi (sblm 21:16) | Claude Code (VSCode) | `claude-sonnet-4-6` | default | Diskusi versi Python, buat uv venv |
-| ~sesi (sblm 21:16) | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | Buat log.md, token efficiency |
-| ~sesi | Claude Code (VSCode) | `claude-sonnet-4-6` | default | Tambah seksi Agent/Model info |
+| 2026-06-07 21:25 | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | Current ✅ — masih aktif |
 | ~sesi (sblm 21:19) | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | Buat reusable prompt, git tracking |
-| 2026-06-07 21:25 | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | Buat changelog ini (current) ✅ |
+| ~sesi | Claude Code (VSCode) | `claude-sonnet-4-6` | default | Tambah seksi Agent/Model info |
+| ~sesi (sblm 21:16) | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | Buat log.md, token efficiency |
+| ~awal sesi (sblm 21:16) | Claude Code (VSCode) | `claude-sonnet-4-6` | default | Diskusi versi Python, buat uv venv |
 
-> Catatan: baris bertanda `~` adalah perkiraan urutan dalam sesi 2026-06-07 (tracking baru dimulai 21:25). Mulai sekarang tiap perubahan dicatat dengan waktu persis.
+> Catatan: baris bertanda `~` adalah perkiraan urutan dalam sesi 2026-06-07 (tracking baru dimulai 21:25); urutan terbaru di atas. Mulai sekarang tiap perubahan dicatat dengan waktu persis.
 
 ---
 
@@ -121,14 +121,17 @@ Semua artefak proyek + di mana state disimpan, agar bisa dilacak dari satu tempa
 
 Format commit: `YYYY-MM-DD | <task> | <git commit hash>`
 
+> **Urutan: terbaru di atas (descending).** Baris baru ditambah di paling atas.
+
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
-| 2026-06-07 21:16 | Setup awal: diskusi versi Python, buat uv venv Python 3.13.12, buat log.md, adopsi token efficiency guideline, init git repo | `50285b3` | ✅ Done |
-| 2026-06-07 21:17 | Update git email + tambah kolom waktu (HH:MM) di session log | `22472c1` | ✅ Done |
-| 2026-06-07 21:19 | Buat `reusable_setup_prompt.md` (prompt setup untuk proyek lain) | `b6fc6b0` | ✅ Done |
+| 2026-06-07 21:28 | Ubah urutan tabel riwayat jadi terbaru-di-atas (descending) | _(commit berikut)_ | ✅ Done |
 | 2026-06-07 21:25 | Tambah changelog Riwayat Perubahan Agent & Model + aturannya (di log & reusable prompt) | `2df80dc` | ✅ Done |
+| 2026-06-07 21:19 | Buat `reusable_setup_prompt.md` (prompt setup untuk proyek lain) | `b6fc6b0` | ✅ Done |
+| 2026-06-07 21:17 | Update git email + tambah kolom waktu (HH:MM) di session log | `22472c1` | ✅ Done |
+| 2026-06-07 21:16 | Setup awal: diskusi versi Python, buat uv venv Python 3.13.12, buat log.md, adopsi token efficiency guideline, init git repo | `50285b3` | ✅ Done |
 
-> Tiap sesi baru atau task selesai: tambah baris di tabel ini via `Edit` (diff), lalu `git commit`. Format waktu: `YYYY-MM-DD HH:MM`.
+> Tiap sesi baru atau task selesai: tambah baris **di paling atas** tabel ini via `Edit` (diff), lalu `git commit`. Format waktu: `YYYY-MM-DD HH:MM`.
 
 ---
 

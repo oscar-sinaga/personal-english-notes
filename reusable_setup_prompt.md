@@ -27,11 +27,11 @@ LAKUKAN HAL BERIKUT:
 2. BUAT `log.md` DI FOLDER PROYEK (pusat tracking, harus kelihatan di IDE) berisi:
    - Konteks environment (working dir, OS, shell, tanggal)
    - Agent/Model info (platform, provider, nama & versi model, mode khusus, knowledge cutoff)
-   - Tabel "Riwayat Perubahan Agent & Model" → kolom: Waktu (`YYYY-MM-DD HH:MM`) | Agent/Platform | Model | Mode/Effort | Catatan
+   - Tabel "Riwayat Perubahan Agent & Model" → kolom: Waktu (`YYYY-MM-DD HH:MM`) | Agent/Platform | Model | Mode/Effort | Catatan. URUTAN: terbaru di atas (descending).
    - Goal proyek
    - Status saat ini
    - Ringkasan keputusan (decisions log)
-   - Tabel "Session & Task Log" → kolom: Tanggal & Waktu (format `YYYY-MM-DD HH:MM`, sampai menit) | Task | Git Commit (hash) | Status
+   - Tabel "Session & Task Log" → kolom: Tanggal & Waktu (format `YYYY-MM-DD HH:MM`, sampai menit) | Task | Git Commit (hash) | Status. URUTAN: terbaru di atas (descending).
    - Git info (remote, branch, user, tracked files)
    - Next steps
    - Catatan handoff untuk agent lain
