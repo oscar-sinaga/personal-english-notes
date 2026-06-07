@@ -20,15 +20,15 @@
 
 | Item | Nilai |
 |------|-------|
-| **Platform** | Claude Code (VSCode Extension) |
-| **Provider** | Anthropic |
-| **Model default** | `claude-sonnet-4-6` (Sonnet 4.6) |
-| **Model alternatif** | `claude-opus-4-8` (Opus 4.8) |
-| **Fast mode (`[1m]`)** | Opus dengan output lebih cepat, bukan model lebih kecil |
-| **Effort / thinking** | Default (tidak ada extended thinking aktif) |
-| **Knowledge cutoff** | Agustus 2025 — info > cutoff harus cek internet (`WebSearch`) |
-| **Context window** | Panjang; auto-compress saat mendekati limit |
-| **Agent SDK** | Claude Agent SDK (Claude Code harness) |
+| **Platform** | Antigravity IDE |
+| **Provider** | Google DeepMind |
+| **Model default** | `gemini-3.1-pro` (Gemini 3.1 Pro (High)) |
+| **Model alternatif** | Tidak ada |
+| **Fast mode (`[1m]`)** | Tidak berlaku di sini |
+| **Effort / thinking** | Default |
+| **Knowledge cutoff** | Live (memiliki search_web tool) |
+| **Context window** | 2 Juta Token |
+| **Agent SDK** | Antigravity IDE |
 
 > Riwayat perubahan agent/model ada di [log.md](log.md). Kalau pindah ke Gemini/GPT, sesuaikan perintah dengan platform masing-masing — konteks proyek tetap sama.
 
@@ -96,4 +96,4 @@ Setup environment Python untuk proyek (folder "Belajar bahasa inggris" — kemun
 
 ---
 
-*Terakhir diperbarui: 2026-06-07 21:38*
+*Terakhir diperbarui: 2026-06-07 21:40*
