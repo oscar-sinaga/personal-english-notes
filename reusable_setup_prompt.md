@@ -27,6 +27,7 @@ LAKUKAN HAL BERIKUT:
 2. BUAT `log.md` DI FOLDER PROYEK (pusat tracking, harus kelihatan di IDE) berisi:
    - Konteks environment (working dir, OS, shell, tanggal)
    - Agent/Model info (platform, provider, nama & versi model, mode khusus, knowledge cutoff)
+   - Tabel "Riwayat Perubahan Agent & Model" → kolom: Waktu (`YYYY-MM-DD HH:MM`) | Agent/Platform | Model | Mode/Effort | Catatan
    - Goal proyek
    - Status saat ini
    - Ringkasan keputusan (decisions log)
@@ -52,6 +53,7 @@ LAKUKAN HAL BERIKUT:
 
 6. ATURAN KERJA BERKELANJUTAN
    - Tiap sesi/task selesai → tambah baris di Session & Task Log (tanggal+jam) → `git commit` → catat hash-nya.
+   - Setiap GANTI agent/model/tipe/mode (mis. pindah ke Gemini/GPT, ganti versi model, fast mode) → tambah baris di "Riwayat Perubahan Agent & Model" dengan waktu nyata. Agent yang baru ambil alih WAJIB menulis baris identitasnya sendiri.
    - Update `log.md` via edit (diff), bukan tulis ulang.
    - Info yang melewati knowledge cutoff (mis. versi software terbaru) → CEK INTERNET, jangan dari ingatan.
 
