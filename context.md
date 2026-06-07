@@ -46,7 +46,7 @@ Setup environment Python untuk proyek (folder "Belajar bahasa inggris" — kemun
 - Lokasi venv: `.venv` di dalam folder kerja.
 - Cara aktivasi: `.venv\Scripts\activate`
 - Belum ada dependency/package yang diinstall.
-- Belum ada source code.
+- **Berhasil mengekstrak 3 riwayat chat ke folder `materi_bahasa_inggris/`**.
 
 ---
 
@@ -56,6 +56,7 @@ Setup environment Python untuk proyek (folder "Belajar bahasa inggris" — kemun
 |---------|--------|-----|
 | **context.md** (file ini) | root proyek | Konteks & state proyek saat ini + referensi handoff |
 | **log.md** | root proyek | Catatan kronologis: session/task log, changelog agent/model, keputusan |
+| **materi_bahasa_inggris/** | root proyek | File ekstraksi riwayat chat Gemini (Chat 1, 2, 3) |
 | guideline_token_efficiency.md | root proyek | Aturan hemat token |
 | reusable_setup_prompt.md | root proyek | Prompt siap-pakai untuk setup proyek baru yang sama |
 | `.venv/` | root proyek | Python 3.13.12 environment (uv) — tidak di-commit |
@@ -96,4 +97,4 @@ Setup environment Python untuk proyek (folder "Belajar bahasa inggris" — kemun
 
 ---
 
-*Terakhir diperbarui: 2026-06-07 21:40*
+*Terakhir diperbarui: 2026-06-07 22:45*
