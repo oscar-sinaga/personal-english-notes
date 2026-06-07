@@ -100,4 +100,32 @@ Semua artefak proyek + di mana state disimpan, agar bisa dilacak dari satu tempa
 
 ---
 
+---
+
+## 🗓️ Session & Task Log
+
+Format commit: `YYYY-MM-DD | <task> | <git commit hash>`
+
+| Tanggal | Task | Git Commit | Status |
+|---------|------|------------|--------|
+| 2026-06-07 | Setup awal: diskusi versi Python, buat uv venv Python 3.13.12, buat log.md, adopsi token efficiency guideline, init git repo | `50285b3` | ✅ Done |
+
+> Tiap sesi baru atau task selesai: tambah baris di tabel ini via `Edit` (diff), lalu `git commit`.
+
+---
+
+## 🔧 Git Info
+
+| Item | Nilai |
+|------|-------|
+| **Remote** | Belum ada (local only) |
+| **Branch default** | `master` |
+| **User** | Oscar (`oscar.m.sinaga@smmf.co.id`) — set lokal di repo ini |
+| **Tracked files** | `log.md`, `guideline_token_efficiency.md` |
+| **Untracked** | `.venv/` (tidak perlu di-commit) |
+
+> `.venv/` sebaiknya ditambah ke `.gitignore`.
+
+---
+
 *Terakhir diperbarui: 2026-06-07*
