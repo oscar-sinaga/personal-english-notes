@@ -10,6 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
+| 2026-06-07 21:36 | Betulkan changelog agent/model: hapus baris ganda (state sama), jujurkan waktu yang tak tercatat | _(commit berikut)_ | ✅ Done |
 | 2026-06-07 21:32 | Pisahkan jadi `context.md` (state + referensi) & `log.md` (kronologis) | `b91933f` | ✅ Done |
 | 2026-06-07 21:28 | Ubah urutan tabel riwayat jadi terbaru-di-atas (descending) | `1f301f1` | ✅ Done |
 | 2026-06-07 21:25 | Tambah changelog Riwayat Perubahan Agent & Model + aturannya | `2df80dc` | ✅ Done |
@@ -23,15 +24,16 @@
 
 > **WAJIB:** setiap ganti agent (Claude/Gemini/GPT), model/versi, tipe, atau mode/effort (fast `[1m]`, thinking) → **tambah satu baris di PALING ATAS** (terbaru di atas) dengan **waktu nyata** (`Get-Date`/`date`/`git log`, jangan nebak). Agent yang baru ambil alih wajib menulis baris identitasnya sendiri.
 
-| Waktu | Agent / Platform | Model | Mode / Effort | Catatan |
-|-------|------------------|-------|---------------|---------|
-| 2026-06-07 21:25 | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | Current ✅ — masih aktif |
-| ~sesi (sblm 21:19) | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | Buat reusable prompt, git tracking |
-| ~sesi | Claude Code (VSCode) | `claude-sonnet-4-6` | default | Tambah seksi Agent/Model info |
-| ~sesi (sblm 21:16) | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | Buat log.md, token efficiency |
-| ~awal sesi (sblm 21:16) | Claude Code (VSCode) | `claude-sonnet-4-6` | default | Diskusi versi Python, buat uv venv |
+> 1 baris = 1 state model (dicatat saat model itu mulai aktif, **bukan** saat log ditulis).
 
-> Baris bertanda `~` = perkiraan urutan sesi 2026-06-07 (tracking dimulai 21:25). Mulai sekarang waktu dicatat persis.
+| # | Waktu mulai aktif | Agent / Platform | Model | Mode / Effort | Catatan |
+|---|-------------------|------------------|-------|---------------|---------|
+| 4 | ~21:19 → sekarang | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | **Current ✅** — aktif sejak switch terakhir; buat reusable prompt, git, split context/log |
+| 3 | tak tercatat | Claude Code (VSCode) | `claude-sonnet-4-6` | default | Tambah seksi Agent/Model info |
+| 2 | tak tercatat | Claude Code (VSCode) | `claude-opus-4-8` | fast `[1m]` | Buat log.md, adopsi token efficiency |
+| 1 | awal sesi (tak tercatat) | Claude Code (VSCode) | `claude-sonnet-4-6` | default | Diskusi versi Python, buat uv venv |
+
+> **Catatan jujur:** state #1–#3 terjadi SEBELUM tracking presisi dimulai → waktu persisnya **tidak tercatat, hanya urutan (#) yang pasti**. State #4 di-anchor kira-kira `~21:19` (dekat git commit `b6fc6b0` @21:20). Git commit ≠ waktu ganti model. Mulai sekarang tiap switch dicatat dengan waktu nyata (`Get-Date`).
 
 ---
 
