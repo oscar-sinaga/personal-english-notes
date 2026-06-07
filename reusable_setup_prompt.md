@@ -24,18 +24,24 @@ LAKUKAN HAL BERIKUT:
    - Hasil riset web diringkas ke file dulu, jangan paste mentah ke chat.
    - Kalau ada file `guideline_token_efficiency.md`, baca & ikuti.
 
-2. BUAT `log.md` DI FOLDER PROYEK (pusat tracking, harus kelihatan di IDE) berisi:
-   - Konteks environment (working dir, OS, shell, tanggal)
-   - Agent/Model info (platform, provider, nama & versi model, mode khusus, knowledge cutoff)
-   - Tabel "Riwayat Perubahan Agent & Model" → kolom: Waktu (`YYYY-MM-DD HH:MM`) | Agent/Platform | Model | Mode/Effort | Catatan. URUTAN: terbaru di atas (descending).
-   - Goal proyek
-   - Status saat ini
-   - Ringkasan keputusan (decisions log)
-   - Tabel "Session & Task Log" → kolom: Tanggal & Waktu (format `YYYY-MM-DD HH:MM`, sampai menit) | Task | Git Commit (hash) | Status. URUTAN: terbaru di atas (descending).
-   - Git info (remote, branch, user, tracked files)
-   - Next steps
-   - Catatan handoff untuk agent lain
-   - Tabel "Artefak & Lokasi" (semua file penting + di mana state disimpan)
+2. BUAT 2 FILE TRACKING DI FOLDER PROYEK (harus kelihatan di IDE) — dipisah biar fokus:
+
+   a) `context.md` — STATE PROYEK SAAT INI + referensi (BUKAN kronologis):
+      - Konteks environment (working dir, OS, shell, git, tanggal)
+      - Agent/Model info snapshot (platform, provider, nama & versi model, mode khusus, knowledge cutoff)
+      - Goal proyek
+      - Status saat ini
+      - Tabel "Artefak & Lokasi" (semua file penting + di mana state disimpan)
+      - Next steps
+      - Catatan handoff untuk agent lain
+      - Git info (remote, branch, user, tracked files)
+
+   b) `log.md` — CATATAN KRONOLOGIS (terbaru di atas / descending):
+      - Tabel "Session & Task Log" → kolom: Tanggal & Waktu (`YYYY-MM-DD HH:MM`, sampai menit) | Task | Git Commit (hash) | Status
+      - Tabel "Riwayat Perubahan Agent & Model" → kolom: Waktu (`YYYY-MM-DD HH:MM`) | Agent/Platform | Model | Mode/Effort | Catatan
+      - Keputusan (decisions log)
+
+   Saling tautkan: `context.md` → `log.md` (riwayat), `log.md` → `context.md` (state).
 
 3. GIT TRACKING
    - `git init` di folder proyek (kalau belum ada).
@@ -48,8 +54,8 @@ LAKUKAN HAL BERIKUT:
    - Catat tanggal + jam (sampai menit) tiap entry di Session & Task Log.
 
 5. PERSISTENCE & HANDOFF
-   - Semua tracking utama WAJIB di dalam folder proyek (`log.md`) agar kelihatan di IDE & bisa dibaca agent lain.
-   - Boleh simpan pointer ringkas ke memory sistem (kalau platform mendukung) untuk auto-recall antar sesi — tapi detail tetap di `log.md`, jangan ada yang cuma tersimpan di luar folder.
+   - Semua tracking utama WAJIB di dalam folder proyek (`context.md` + `log.md`) agar kelihatan di IDE & bisa dibaca agent lain.
+   - Boleh simpan pointer ringkas ke memory sistem (kalau platform mendukung) untuk auto-recall antar sesi — tapi detail tetap di file proyek, jangan ada yang cuma tersimpan di luar folder.
 
 6. ATURAN KERJA BERKELANJUTAN
    - Tiap sesi/task selesai → tambah baris di Session & Task Log (tanggal+jam) → `git commit` → catat hash-nya.
