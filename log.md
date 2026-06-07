@@ -10,7 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
-| 2026-06-07 21:36 | Betulkan changelog agent/model: hapus baris ganda (state sama), jujurkan waktu yang tak tercatat | _(commit berikut)_ | ✅ Done |
+| 2026-06-07 21:36 | Betulkan changelog agent/model: hapus baris ganda (state sama), jujurkan waktu yang tak tercatat | `b013f60` | ✅ Done |
 | 2026-06-07 21:32 | Pisahkan jadi `context.md` (state + referensi) & `log.md` (kronologis) | `b91933f` | ✅ Done |
 | 2026-06-07 21:28 | Ubah urutan tabel riwayat jadi terbaru-di-atas (descending) | `1f301f1` | ✅ Done |
 | 2026-06-07 21:25 | Tambah changelog Riwayat Perubahan Agent & Model + aturannya | `2df80dc` | ✅ Done |
