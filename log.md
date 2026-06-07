@@ -125,7 +125,7 @@ Format commit: `YYYY-MM-DD | <task> | <git commit hash>`
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
-| 2026-06-07 21:28 | Ubah urutan tabel riwayat jadi terbaru-di-atas (descending) | _(commit berikut)_ | ✅ Done |
+| 2026-06-07 21:28 | Ubah urutan tabel riwayat jadi terbaru-di-atas (descending) | `1f301f1` | ✅ Done |
 | 2026-06-07 21:25 | Tambah changelog Riwayat Perubahan Agent & Model + aturannya (di log & reusable prompt) | `2df80dc` | ✅ Done |
 | 2026-06-07 21:19 | Buat `reusable_setup_prompt.md` (prompt setup untuk proyek lain) | `b6fc6b0` | ✅ Done |
 | 2026-06-07 21:17 | Update git email + tambah kolom waktu (HH:MM) di session log | `22472c1` | ✅ Done |
