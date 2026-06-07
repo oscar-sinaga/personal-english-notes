@@ -111,7 +111,7 @@ Format commit: `YYYY-MM-DD | <task> | <git commit hash>`
 |-----------------|------|------------|--------|
 | 2026-06-07 21:16 | Setup awal: diskusi versi Python, buat uv venv Python 3.13.12, buat log.md, adopsi token efficiency guideline, init git repo | `50285b3` | ✅ Done |
 | 2026-06-07 21:17 | Update git email + tambah kolom waktu (HH:MM) di session log | `22472c1` | ✅ Done |
-| 2026-06-07 21:19 | Buat `reusable_setup_prompt.md` (prompt setup untuk proyek lain) | _(pending commit)_ | ✅ Done |
+| 2026-06-07 21:19 | Buat `reusable_setup_prompt.md` (prompt setup untuk proyek lain) | `b6fc6b0` | ✅ Done |
 
 > Tiap sesi baru atau task selesai: tambah baris di tabel ini via `Edit` (diff), lalu `git commit`. Format waktu: `YYYY-MM-DD HH:MM`.
 
