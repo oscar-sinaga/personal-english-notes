@@ -10,7 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
-| 2026-06-09 06:12 | Memulai sesi belajar bahasa Inggris: penjelasan Passive-Active Gap, setup folder percakapan/ | TBD | ✅ Done |
+| 2026-06-09 06:12 | Memulai sesi belajar bahasa Inggris: penjelasan Passive-Active Gap, setup folder percakapan/ | `2ac69ab` | ✅ Done |
 | 2026-06-07 22:54 | Update keputusan: Menunda pembuatan web app, fokus ke praktik langsung bahasa Inggris | `dfe3c26` | ✅ Done |
 | 2026-06-07 22:45 | Mengekstrak 3 chat Gemini tentang rencana belajar bahasa Inggris ke materi_bahasa_inggris/ | `f4156b9` | ✅ Done |
 | 2026-06-07 21:40 | Membaca semua file .md untuk memahami konteks (handoff ke Antigravity) | `c22b7e9` | ✅ Done |
