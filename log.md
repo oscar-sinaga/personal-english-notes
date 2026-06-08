@@ -10,6 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
+| 2026-06-09 06:26 | Membedah detail strategi speaking (Pipeline Otak ke Mulut) | TBD | ✅ Done |
 | 2026-06-09 06:21 | Mencatat strategi kelancaran speaking (Thinking in English, Collocations, dll) | `d467b6c` | ✅ Done |
 | 2026-06-09 06:17 | Menetapkan sistem Feedback Loop (Naturalness, Precision, Flow) untuk latihan bahasa Inggris | `d91e7c4` | ✅ Done |
 | 2026-06-09 06:12 | Memulai sesi belajar bahasa Inggris: penjelasan Passive-Active Gap, setup folder percakapan/ | `2ac69ab` | ✅ Done |
@@ -59,4 +60,4 @@
 
 ---
 
-*Terakhir diperbarui: 2026-06-09 06:21*
+*Terakhir diperbarui: 2026-06-09 06:26*
