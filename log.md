@@ -10,7 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
-| 2026-06-09 06:44 | Mencatat panduan Habit Stacking untuk rutinitas bahasa Inggris | TBD | ✅ Done |
+| 2026-06-09 06:44 | Mencatat panduan Habit Stacking untuk rutinitas bahasa Inggris | `d283174` | ✅ Done |
 | 2026-06-09 06:35 | Mencatat panduan mental Thinking in English & latihan Circumlocution | `2bfb67b` | ✅ Done |
 | 2026-06-09 06:26 | Membedah detail strategi speaking (Pipeline Otak ke Mulut) | `31c7653` | ✅ Done |
 | 2026-06-09 06:21 | Mencatat strategi kelancaran speaking (Thinking in English, Collocations, dll) | `d467b6c` | ✅ Done |
