@@ -10,7 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
-| 2026-06-15 20:30 | Mencatat kalkulasi waktu (600 jam/CEFR) untuk mencapai Second Nature | TBD | ✅ Done |
+| 2026-06-15 20:30 | Mencatat kalkulasi waktu (600 jam/CEFR) untuk mencapai Second Nature | `7b2cdeb` | ✅ Done |
 | 2026-06-15 20:29 | Mencatat timeline realistis pembiasaan Active English (Fase 1-3) | `b83db20` | ✅ Done |
 | 2026-06-09 06:57 | Mencatat strategi diskusi tertulis di grup Tech global (Lego Blocks, dll) | `13b7103` | ✅ Done |
 | 2026-06-09 06:51 | Mencatat panduan Micro-dosing untuk mencegah cognitive overload | `9059ce3` | ✅ Done |
