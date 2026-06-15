@@ -10,7 +10,9 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
-| 2026-06-15 20:34 | Mencatat taktik menghadapi Live Speaking Test & Split Profile | TBD | ✅ Done |
+| 2026-06-15 20:36 | Mencatat analisis hasil Speaking Test A2+ & konfirmasi Split Profile | TBD | ✅ Done |
+| 2026-06-15 20:35 | Mencatat analisis laporan Placement Test & validasi Split Profile | TBD | ✅ Done |
+| 2026-06-15 20:34 | Mencatat taktik menghadapi Live Speaking Test & Split Profile | `8e63fe3` | ✅ Done |
 | 2026-06-15 20:33 | Mencatat rencana Role-Play 3 Pilar & Skenario Meeting Credit Scoring | `87730e6` | ✅ Done |
 | 2026-06-15 20:30 | Mencatat kalkulasi waktu (600 jam/CEFR) untuk mencapai Second Nature | `7b2cdeb` | ✅ Done |
 | 2026-06-15 20:29 | Mencatat timeline realistis pembiasaan Active English (Fase 1-3) | `b83db20` | ✅ Done |
@@ -68,4 +70,4 @@
 
 ---
 
-*Terakhir diperbarui: 2026-06-15 20:34*
+*Terakhir diperbarui: 2026-06-15 20:36*
