@@ -10,7 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
-| 2026-06-15 20:37 | Mencatat proyeksi waktu belajar (fase 1-3) untuk Split Profile (The 60-Minute Plan) | TBD | ✅ Done |
+| 2026-06-15 20:37 | Mencatat proyeksi waktu belajar (fase 1-3) untuk Split Profile (The 60-Minute Plan) | `ae7801d` | ✅ Done |
 | 2026-06-15 20:36 | Mencatat analisis hasil Speaking Test A2+ & konfirmasi Split Profile | `3d7b22b` | ✅ Done |
 | 2026-06-15 20:35 | Mencatat analisis laporan Placement Test & validasi Split Profile | `3d7b22b` | ✅ Done |
 | 2026-06-15 20:34 | Mencatat taktik menghadapi Live Speaking Test & Split Profile | `8e63fe3` | ✅ Done |
