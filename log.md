@@ -10,6 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
+| 2026-06-15 20:29 | Mencatat timeline realistis pembiasaan Active English (Fase 1-3) | TBD | ✅ Done |
 | 2026-06-09 06:57 | Mencatat strategi diskusi tertulis di grup Tech global (Lego Blocks, dll) | `13b7103` | ✅ Done |
 | 2026-06-09 06:51 | Mencatat panduan Micro-dosing untuk mencegah cognitive overload | `9059ce3` | ✅ Done |
 | 2026-06-09 06:44 | Mencatat panduan Habit Stacking untuk rutinitas bahasa Inggris | `d283174` | ✅ Done |
@@ -64,4 +65,4 @@
 
 ---
 
-*Terakhir diperbarui: 2026-06-09 06:57*
+*Terakhir diperbarui: 2026-06-15 20:29*
