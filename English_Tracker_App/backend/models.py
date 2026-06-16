@@ -16,6 +16,13 @@ class DoubtExport(BaseModel):
 
 class TranslateRequest(BaseModel):
     text: str
+    mode: str = "quick"
+
+class GrammarRequest(BaseModel):
+    text: str
+
+class ExplainRequest(BaseModel):
+    text: str
 
 class Vocabulary(Base):
     __tablename__ = "vocabulary"
@@ -23,4 +30,13 @@ class Vocabulary(Base):
     id = Column(Integer, primary_key=True, index=True)
     term = Column(String, index=True)
     definition = Column(Text)
+    created_at = Column(String)
+
+class StudySession(Base):
+    __tablename__ = "study_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    topic_id = Column(String, index=True)
+    pillar = Column(String)
+    duration_minutes = Column(Integer)
     created_at = Column(String)

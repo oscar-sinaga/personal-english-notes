@@ -28,6 +28,11 @@
   let newDef = "";
   let vocabStatus = "";
 
+  // Session Stats
+  let sessionStats = { total_hours: 0, total_minutes: 0, last_topic: null };
+  let sessionStatus = "";
+  let weeklyStats = [];
+
   // App Layout State
   let appMode = "dashboard"; // 'dashboard' or 'reading'
   
@@ -47,7 +52,7 @@
   let doubtContent = "";
   let doubtStatus = "";
 
-  const API_URL = "http://localhost:8000/api";
+  const API_URL = "http://127.0.0.1:8000/api";
 
   function buildTocTree(flatToc) {
     let root = [];
@@ -74,6 +79,8 @@
     fetchProgress();
     fetchVocab();
     fetchToc();
+    fetchSessionStats();
+    fetchWeeklyStats();
   });
 
   async function fetchProgress() {
@@ -103,6 +110,20 @@
         tocTree = buildTocTree(data);
       }
     } catch (e) { console.error("Failed to fetch TOC.", e); }
+  }
+
+  async function fetchSessionStats() {
+    try {
+      const res = await fetch(`${API_URL}/sessions/stats`);
+      sessionStats = await res.json();
+    } catch (e) { console.error("Failed to fetch session stats.", e); }
+  }
+
+  async function fetchWeeklyStats() {
+    try {
+      const res = await fetch(`${API_URL}/sessions/weekly`);
+      weeklyStats = await res.json();
+    } catch (e) { console.error("Failed to fetch weekly stats.", e); }
   }
 
   async function addVocab() {
@@ -194,18 +215,20 @@
   function startTimer() {
     if (timerActive) return;
     timerActive = true;
+    activeTimerPillar = appMode === 'reading' ? "Reading Comprehension" : pillars[currentPillarIndex];
     interval = setInterval(() => {
       if (timeRemaining > 0) { timeRemaining--; } 
       else {
         clearInterval(interval);
         timerActive = false;
-        alert(`Time's up for ${pillars[currentPillarIndex]} phase!`);
+        logStudySession();
+        alert(`Time's up for ${activeTimerPillar} phase!`);
       }
     }, 1000);
   }
   function pauseTimer() { timerActive = false; clearInterval(interval); }
   function nextPillar() {
-    if (currentPillarIndex < 2) {
+    if (currentPillarIndex < pillars.length - 1) {
       currentPillarIndex++;
       timeRemaining = customMinutes * 60;
       pauseTimer();
@@ -220,6 +243,41 @@
     const m = Math.floor(secs / 60).toString().padStart(2, '0');
     const s = (secs % 60).toString().padStart(2, '0');
     return `${m}:${s}`;
+  }
+
+  async function logStudySession() {
+    const elapsedSeconds = (customMinutes * 60) - timeRemaining;
+    const elapsedMins = Math.round(elapsedSeconds / 60);
+    
+    if (elapsedMins <= 0) {
+      sessionStatus = "Too short to log.";
+      setTimeout(() => sessionStatus = "", 2000);
+      return;
+    }
+    
+    sessionStatus = "Saving session...";
+    try {
+      const res = await fetch(`${API_URL}/sessions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          topic_id: selectedTopic || "General", 
+          pillar: activeTimerPillar || (appMode === 'reading' ? "Reading Comprehension" : pillars[currentPillarIndex]), 
+          duration_minutes: elapsedMins 
+        })
+      });
+      if (res.ok) {
+        sessionStatus = `Logged ${elapsedMins} mins!`;
+        fetchSessionStats();
+        fetchWeeklyStats();
+        timeRemaining = customMinutes * 60; // Reset timer visually
+      } else {
+        sessionStatus = "Failed to log.";
+      }
+    } catch (e) {
+      sessionStatus = "Error saving.";
+    }
+    setTimeout(() => sessionStatus = "", 3000);
   }
 
   async function submitLog() {
@@ -258,11 +316,33 @@
     }
   }
 
+  function playAudio(text) {
+    try {
+      // Menggunakan API Youdao (sangat stabil & bebas token)
+      const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=2`;
+      const audio = new Audio(url);
+      audio.play().catch(e => {
+        console.error("Audio error:", e);
+        alert("Gagal memutar. Mungkin browser memblokir audio.");
+      });
+    } catch (e) {
+      alert("Gagal memutar suara.");
+    }
+  }
   // Flat map for topic names
   let topicNames = {};
   let isTranslating = false;
   let translateResult = null;
   let translateMode = 'quick';
+  let isCheckingGrammar = false;
+  let grammarResult = null;
+  let grammarError = "";
+  let isExplaining = false;
+  let explainResult = null;
+  let isRecording = false;
+  let isTranscribing = false;
+  let mediaRecorder = null;
+  let audioChunks = [];
 
   async function translateDoubt(mode) {
     if (!doubtContent || !doubtContent.trim()) return;
@@ -284,6 +364,109 @@
       setTimeout(() => { doubtStatus = "" }, 3000);
     } finally {
       isTranslating = false;
+    }
+  }
+
+  async function explainDoubt() {
+    if (!doubtContent || !doubtContent.trim()) return;
+    isExplaining = true;
+    explainResult = null;
+    doubtStatus = "Casting Magic Explain...";
+    try {
+      const res = await fetch(`${API_URL}/explain`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: doubtContent })
+      });
+      const data = await res.json();
+      explainResult = data;
+      doubtStatus = "Magic complete!";
+      setTimeout(() => { doubtStatus = "" }, 3000);
+    } catch (e) {
+      doubtStatus = "Magic failed.";
+      setTimeout(() => { doubtStatus = "" }, 3000);
+    } finally {
+      isExplaining = false;
+    }
+  }
+
+  async function checkGrammar() {
+    if (!logContent || !logContent.trim()) return;
+    isCheckingGrammar = true;
+    grammarResult = null;
+    grammarError = "";
+    
+    try {
+      const res = await fetch(`${API_URL}/check-grammar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: logContent })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        grammarError = data.detail || "Failed to check grammar.";
+      } else {
+        grammarResult = data;
+      }
+    } catch (e) {
+      grammarError = "Network error while checking grammar.";
+    } finally {
+      isCheckingGrammar = false;
+    }
+  }
+
+  async function toggleRecording() {
+    if (isRecording) {
+      // Stop recording
+      if (mediaRecorder && mediaRecorder.state !== "inactive") {
+        mediaRecorder.stop();
+      }
+      isRecording = false;
+    } else {
+      // Start recording
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+
+        mediaRecorder.ondataavailable = event => {
+          if (event.data.size > 0) {
+            audioChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onstop = async () => {
+          isTranscribing = true;
+          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+          const formData = new FormData();
+          formData.append("audio", audioBlob, "recording.webm");
+
+          try {
+            const res = await fetch(`${API_URL}/transcribe`, {
+              method: "POST",
+              body: formData
+            });
+            const data = await res.json();
+            if (res.ok && data.text) {
+              // Append or set the text
+              logContent = logContent.trim() ? logContent + " " + data.text : data.text;
+            } else {
+              grammarError = data.detail || "Transcription failed.";
+            }
+          } catch (e) {
+            grammarError = "Network error during transcription.";
+          } finally {
+            isTranscribing = false;
+            // Stop all tracks to release mic
+            stream.getTracks().forEach(track => track.stop());
+          }
+        };
+
+        mediaRecorder.start();
+        isRecording = true;
+      } catch (err) {
+        grammarError = "Mikrofon tidak diizinkan atau tidak ditemukan.";
+      }
     }
   }
 
@@ -344,14 +527,44 @@
         </button>
       </div>
 
-      <!-- Progress -->
-      <div class="text-right border-l border-slate-800 pl-6 pr-4">
-        <div class="text-xs text-slate-400 mb-1">OVERALL COMPLETION RISK</div>
-        <div class="flex items-center gap-3">
-          <div class="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
-            <div class="h-full bg-teal-500 rounded-full transition-all duration-500" style="width: {progressPercent}%"></div>
+      <!-- Mini Timer (Global) -->
+      <div class="flex items-center bg-slate-900 border border-slate-700 rounded-lg overflow-hidden h-9">
+        <div class="px-3 bg-slate-950 font-mono font-bold {timeRemaining < 60 ? 'text-amber-500' : 'text-teal-400'} border-r border-slate-700 h-full flex items-center justify-center min-w-[70px]">
+          {formatTime(timeRemaining)}
+        </div>
+        {#if !timerActive}
+          <button class="px-3 h-full hover:bg-slate-800 text-slate-400 hover:text-teal-400 transition-colors flex items-center justify-center cursor-pointer" on:click={startTimer} title="Start Timer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
+          </button>
+        {:else}
+          <button class="px-3 h-full hover:bg-slate-800 text-amber-500 hover:text-amber-400 transition-colors flex items-center justify-center cursor-pointer" on:click={pauseTimer} title="Pause Timer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+          </button>
+        {/if}
+        <button class="px-3 h-full border-l border-slate-700 hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition-colors flex items-center justify-center cursor-pointer" on:click={logStudySession} title="Log Time">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+        </button>
+      </div>
+
+      <!-- Progress & Analytics -->
+      <div class="flex items-center">
+        <!-- Focus Analytics -->
+        <div class="text-right border-l border-slate-800 pl-6 pr-6">
+          <div class="text-xs text-slate-400 mb-1">FOCUS HOURS (600H)</div>
+          <div class="flex items-center gap-3 justify-end">
+            <span class="font-mono font-bold {sessionStats.total_hours > 100 ? 'text-teal-400' : 'text-sky-400'}">{sessionStats.total_hours} <span class="text-xs text-slate-500">h</span></span>
           </div>
-          <span class="font-mono font-bold {progressPercent > 50 ? 'text-teal-400' : 'text-amber-400'}">{progressPercent}%</span>
+        </div>
+        
+        <!-- Module Progress -->
+        <div class="text-right border-l border-slate-800 pl-6 pr-4">
+          <div class="text-xs text-slate-400 mb-1">OVERALL COMPLETION RISK</div>
+          <div class="flex items-center gap-3">
+            <div class="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-full bg-teal-500 rounded-full transition-all duration-500" style="width: {progressPercent}%"></div>
+            </div>
+            <span class="font-mono font-bold {progressPercent > 50 ? 'text-teal-400' : 'text-amber-400'}">{progressPercent}%</span>
+          </div>
         </div>
       </div>
 
@@ -377,6 +590,25 @@
     
     <!-- Left Column: Syllabus Tree (Scrollable) -->
     <section class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col h-full overflow-hidden">
+      
+      <!-- Weekly Progress Chart -->
+      <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b border-slate-800">Weekly Progress</h2>
+      <div class="flex items-end justify-between h-20 gap-1 mb-5 px-1 shrink-0">
+        {#each weeklyStats as stat}
+          <div class="flex flex-col items-center flex-1 group">
+            <div class="relative w-full flex justify-center h-16 items-end bg-slate-800/30 rounded-t-sm">
+              <div class="w-full max-w-[20px] bg-sky-500 rounded-t-sm opacity-80 group-hover:opacity-100 transition-all duration-300 relative group-hover:bg-teal-400" style="height: {Math.max(Math.min((stat.minutes / 120) * 100, 100), stat.minutes > 0 ? 5 : 0)}%;">
+                <span class="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-teal-300 opacity-0 group-hover:opacity-100 transition-opacity">{stat.minutes}m</span>
+              </div>
+            </div>
+            <span class="text-[9px] text-slate-500 mt-1 font-mono uppercase tracking-widest">{stat.day_name}</span>
+          </div>
+        {/each}
+        {#if weeklyStats.length === 0}
+          <div class="text-xs text-slate-600 w-full text-center">Loading chart...</div>
+        {/if}
+      </div>
+
       <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Course Syllabus</h2>
       
       <div class="overflow-y-auto pr-2 custom-scrollbar flex-1">
@@ -419,6 +651,13 @@
           </div>
         {/each}
       </div>
+
+      {#if sessionStats.last_topic}
+        <div class="mt-4 pt-3 border-t border-slate-800 shrink-0">
+          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Last Studied Topic</div>
+          <div class="text-xs text-indigo-400 truncate bg-slate-950 p-2 rounded border border-slate-800">{topicNames[sessionStats.last_topic] || sessionStats.last_topic}</div>
+        </div>
+      {/if}
     </section>
 
     <!-- Center Column: Main Operations (Timer & Logger) -->
@@ -440,15 +679,20 @@
             <input type="number" bind:value={customMinutes} min="1" max="120" class="w-16 bg-slate-950 text-center rounded border border-slate-700 text-slate-200 outline-none focus:border-teal-500 text-sm py-1">
             <span class="text-slate-400 self-center text-xs">min</span>
             <button on:click={() => { timeRemaining = customMinutes * 60; pauseTimer(); }} class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-bold text-slate-300 transition-colors cursor-pointer">Set Time</button>
+            <button class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 rounded text-xs font-bold text-slate-100 transition-colors cursor-pointer ml-2 flex items-center gap-1" on:click={logStudySession} title="Manually log the time elapsed">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+              Log Time
+            </button>
+            {#if sessionStatus} <span class="text-teal-400 self-center text-xs ml-2">{sessionStatus}</span> {/if}
           </div>
           <div class="flex justify-center gap-3">
             {#if !timerActive}
               <button class="px-6 py-2 rounded-lg font-bold bg-teal-500 hover:bg-teal-400 text-slate-950 transition-colors cursor-pointer" on:click={startTimer}>Start Run</button>
             {:else}
-              <button class="px-6 py-2 rounded-lg font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer" on:click={pauseTimer}>Halt</button>
+              <button class="px-6 py-2 rounded-lg font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer" on:click={pauseTimer}>Pause</button>
             {/if}
             <button class="px-6 py-2 rounded-lg font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors cursor-pointer disabled:opacity-50" on:click={resetTimer}>Reset</button>
-            <button class="px-6 py-2 rounded-lg font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50" on:click={nextPillar} disabled={currentPillarIndex === 2}>Next Stage</button>
+            <button class="px-6 py-2 rounded-lg font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50" on:click={nextPillar} disabled={currentPillarIndex === pillars.length - 1}>Next Stage</button>
           </div>
         </div>
       </div>
@@ -513,19 +757,63 @@
           </div>
         </div>
         
-        <div class="flex-1 flex flex-col min-h-[250px]">
+        <div class="flex-1 flex flex-col min-h-[200px]">
           <textarea id="content" bind:value={logContent} class="flex-1 w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg p-4 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none resize-none" placeholder="Draft your technical summary here... (Markdown supported)"></textarea>
         </div>
+
+        <!-- AI Grammar Checker Results -->
+        {#if grammarError}
+          <div class="mt-3 p-3 bg-red-950/40 border border-red-800 rounded-lg text-xs text-red-300">
+            <strong>Error:</strong> {grammarError}
+          </div>
+        {/if}
+        {#if grammarResult}
+          <div class="mt-3 p-3 bg-indigo-950/40 border border-indigo-800 rounded-lg shadow-inner max-h-[200px] overflow-y-auto custom-scrollbar">
+            <div class="mb-2">
+              <span class="text-[10px] font-bold text-teal-400 uppercase tracking-wider">Corrected Grammar</span>
+              <p class="text-xs text-slate-200 mt-1">{grammarResult.corrected}</p>
+            </div>
+            <div class="mb-2">
+              <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Native Alternative</span>
+              <p class="text-xs text-slate-200 mt-1 italic">"{grammarResult.native_alternative}"</p>
+            </div>
+            <div>
+              <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Explanation</span>
+              <p class="text-[11px] text-slate-400 mt-1">{grammarResult.explanation}</p>
+            </div>
+          </div>
+        {/if}
         
-        <div class="mt-4 flex items-center justify-between">
-          <button class="px-6 py-2 rounded-lg font-bold bg-white text-slate-900 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer" on:click={submitLog} disabled={!logContent.trim()}>
-            Save to IDE
-          </button>
+        <div class="mt-4 flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <button class="px-6 py-2 rounded-lg font-bold bg-white text-slate-900 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer" on:click={submitLog} disabled={!logContent.trim() || isCheckingGrammar}>
+              Save to IDE
+            </button>
+            <button class="px-3 py-2 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-500 text-slate-100 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50" on:click={checkGrammar} disabled={!logContent.trim() || isCheckingGrammar}>
+              {#if isCheckingGrammar}
+                <svg class="animate-spin h-3 w-3 text-slate-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Checking...
+              {:else}
+                🤖 Check Grammar
+              {/if}
+            </button>
+            <button class="px-3 py-2 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 {isRecording ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}" on:click={toggleRecording} disabled={isTranscribing || isCheckingGrammar}>
+              {#if isTranscribing}
+                <svg class="animate-spin h-3 w-3 text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Transcribing...
+              {:else if isRecording}
+                🛑 Stop Recording
+              {:else}
+                🎤 Record Speech
+              {/if}
+            </button>
+          </div>
           {#if exportStatus}
             <span class="text-teal-400 text-sm flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
               {exportStatus}
             </span>
+
           {/if}
         </div>
       </div>
@@ -717,6 +1005,23 @@
               <button class="text-[10px] font-bold bg-teal-600 hover:bg-teal-500 text-slate-950 px-3 py-1.5 rounded cursor-pointer transition-colors" on:click={addVocab}>Save to Lexicon</button>
               {#if vocabStatus} <span class="text-teal-400 text-[10px]">{vocabStatus}</span> {/if}
             </div>
+
+            <!-- Saved Vocabularies -->
+            {#if vocabularies.length > 0}
+              <div class="mt-3 flex flex-col gap-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-1 border-t border-slate-700 pt-3">
+                {#each vocabularies as v}
+                  <div class="bg-slate-900 border border-slate-800 p-2 rounded flex justify-between items-start group">
+                    <div class="flex flex-col gap-1 flex-1">
+                      <span class="text-[11px] font-bold text-teal-400">{v.term}</span>
+                      <span class="text-[10px] text-slate-300 leading-relaxed">{v.definition}</span>
+                    </div>
+                    <button class="text-slate-500 hover:text-teal-400 transition-colors p-1" on:click={() => playAudio(v.term)} title="Play Pronunciation">
+                      🔊
+                    </button>
+                  </div>
+                {/each}
+              </div>
+            {/if}
           </div>
 
           <!-- Doubt Catcher -->
@@ -746,17 +1051,43 @@
                   {/if}
                 </button>
               </div>
+
+              <button class="text-[10px] font-bold bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider flex items-center justify-center gap-1 shadow-[0_0_10px_rgba(192,38,211,0.5)]" on:click={explainDoubt} disabled={!doubtContent || !doubtContent.trim() || isExplaining}>
+                {#if isExplaining}
+                  <svg class="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  Thinking...
+                {:else}
+                  🪄 Magic Explain (ELI5)
+                {/if}
+              </button>
               
               <button class="text-[10px] font-bold bg-amber-600 hover:bg-amber-500 text-slate-950 px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider" on:click={submitDoubt} disabled={!doubtContent || !doubtContent.trim()}>Save for AI Review</button>
               
               {#if doubtStatus} <span class="text-amber-400 text-[10px] text-center mt-1">{doubtStatus}</span> {/if}
             </div>
 
+            <!-- Beautiful Explain Result UI -->
+            {#if explainResult}
+              <div class="mt-4 p-4 bg-fuchsia-950/20 border border-fuchsia-800 rounded-lg shadow-[0_0_15px_rgba(192,38,211,0.1)]">
+                <div class="mb-3">
+                  <span class="text-[10px] font-bold text-fuchsia-400 uppercase tracking-wider flex items-center gap-1 mb-1">🪄 Analogi Ringan</span>
+                  <p class="text-[11px] text-slate-200 leading-relaxed bg-fuchsia-900/30 p-2 rounded border-l-2 border-fuchsia-500">{explainResult.analogy}</p>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1 mb-1">⚙️ Makna Teknis</span>
+                  <p class="text-[11px] text-slate-300 leading-relaxed">{explainResult.technical_meaning}</p>
+                </div>
+              </div>
+            {/if}
+
             <!-- Beautiful Translation Result UI -->
             {#if translateResult}
               <div class="mt-4 p-3 bg-slate-900 border border-slate-700 rounded-lg shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar">
                 <div class="mb-3">
-                  <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Terjemahan Indonesia:</span>
+                  <div class="flex items-center justify-between mb-1">
+                    <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Terjemahan Indonesia:</span>
+                    <button class="text-[10px] text-slate-400 hover:text-teal-400 transition-colors flex items-center gap-1 cursor-pointer" on:click={() => playAudio(doubtContent)} title="Listen Original English">🔊 Original</button>
+                  </div>
                   <p class="text-xs text-slate-200 mt-1 leading-relaxed bg-slate-800/50 p-2 rounded">{translateResult.translation}</p>
                 </div>
 
@@ -765,7 +1096,10 @@
                     <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">📖 General Dictionary</span>
                     {#each translateResult.dictionary as dict}
                       <div class="mt-2 bg-slate-800 p-2 rounded border-l-2 border-emerald-500">
-                        <p class="text-sm font-bold text-slate-200">{dict.word} <span class="text-xs font-normal text-slate-400">{dict.phonetic}</span></p>
+                        <div class="flex items-center gap-2 mb-1">
+                          <p class="text-sm font-bold text-slate-200">{dict.word} <span class="text-xs font-normal text-slate-400">{dict.phonetic}</span></p>
+                          <button class="text-slate-400 hover:text-teal-400 transition-colors p-0.5 cursor-pointer" on:click={() => playAudio(dict.word)} title="Listen">🔊</button>
+                        </div>
                         <ul class="mt-1 list-disc list-inside text-xs text-slate-300">
                           {#each dict.meanings as meaning}
                             <li class="mb-1"><span class="italic text-emerald-400">({meaning.pos})</span> {meaning.def}
@@ -785,7 +1119,10 @@
                     <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">🧠 Credit Risk Context</span>
                     {#each translateResult.glossary as gloss}
                       <div class="mt-2 bg-indigo-950/30 p-2 rounded border-l-2 border-indigo-500">
-                        <p class="text-sm font-bold text-indigo-300">{gloss.term}</p>
+                        <div class="flex items-center gap-2 mb-1">
+                          <p class="text-sm font-bold text-indigo-300">{gloss.term}</p>
+                          <button class="text-indigo-400 hover:text-teal-400 transition-colors p-0.5 cursor-pointer" on:click={() => playAudio(gloss.term)} title="Listen">🔊</button>
+                        </div>
                         <div class="text-[10px] mt-1 space-y-1">
                           <p><span class="text-slate-400 font-semibold w-16 inline-block">General:</span> <span class="text-slate-300">{gloss.general}</span></p>
                           <p><span class="text-slate-400 font-semibold w-16 inline-block">Credit:</span> <span class="text-amber-300 font-medium">{gloss.credit}</span></p>

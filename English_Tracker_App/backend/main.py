@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, UploadFile, File
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -9,6 +9,10 @@ import os
 import json
 import datetime
 import requests
+from dotenv import load_dotenv
+from openai import OpenAI
+
+load_dotenv()
 
 # Create database tables
 models.Base.metadata.create_all(bind=database.engine)
@@ -63,6 +67,11 @@ class TranslateRequest(BaseModel):
     text: str
     mode: str = "quick"
 
+class SessionCreate(BaseModel):
+    topic_id: str
+    pillar: str
+    duration_minutes: int
+
 @app.get("/api/progress")
 def get_progress(db: Session = Depends(get_db)):
     progress = db.query(models.ModuleProgress).all()
@@ -93,6 +102,65 @@ def add_vocabulary(vocab: VocabularyCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(record)
     return record
+
+@app.post("/api/sessions")
+def log_session(session_data: SessionCreate, db: Session = Depends(get_db)):
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    record = models.StudySession(
+        topic_id=session_data.topic_id,
+        pillar=session_data.pillar,
+        duration_minutes=session_data.duration_minutes,
+        created_at=timestamp
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+    return record
+
+from sqlalchemy import func
+
+@app.get("/api/sessions/stats")
+def get_session_stats(db: Session = Depends(get_db)):
+    # Calculate total minutes
+    total_minutes = db.query(func.sum(models.StudySession.duration_minutes)).scalar() or 0
+    total_hours = round(total_minutes / 60, 1)
+    
+    # Get last studied topic
+    last_session = db.query(models.StudySession).order_by(models.StudySession.id.desc()).first()
+    last_topic = last_session.topic_id if last_session else None
+    
+    return {
+        "total_hours": total_hours,
+        "total_minutes": total_minutes,
+        "last_topic": last_topic
+    }
+
+@app.get("/api/sessions/weekly")
+def get_weekly_sessions(db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta
+    
+    # Generate the last 7 days
+    today = datetime.now()
+    days = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(6, -1, -1)]
+    
+    # Initialize dictionary with 0 minutes
+    weekly_data = {day: 0 for day in days}
+    
+    # Fetch all sessions (in a real app, we'd filter by date, but SQLite dates are strings here)
+    sessions = db.query(models.StudySession).all()
+    for s in sessions:
+        if s.created_at:
+            # created_at format: YYYY-MM-DD HH:MM
+            date_str = s.created_at.split(" ")[0]
+            if date_str in weekly_data:
+                weekly_data[date_str] += s.duration_minutes
+                
+    # Format for frontend
+    result = [
+        {"date": day, "day_name": datetime.strptime(day, "%Y-%m-%d").strftime("%a"), "minutes": minutes}
+        for day, minutes in weekly_data.items()
+    ]
+    return result
 
 @app.post("/api/export-log")
 def export_log(log: LogExport):
@@ -245,3 +313,124 @@ async def translate_text(req: TranslateRequest, db: Session = Depends(get_db)):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/check-grammar")
+def check_grammar(req: models.GrammarRequest):
+    import os
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or api_key == "" or "isi_key_anda" in api_key.lower():
+        raise HTTPException(status_code=400, detail="API Key OpenAI belum diisi di file .env. Silakan buka file backend/.env dan masukkan API Key Anda.")
+
+    try:
+        client = OpenAI(api_key=api_key)
+        
+        prompt = f"""
+You are an expert native English speaker and writing tutor. 
+Please review the following text. 
+1. Fix any grammatical errors.
+2. Provide a more natural, native-sounding alternative (using common idioms or phrasal verbs if appropriate).
+3. Briefly explain the key changes in Indonesian.
+
+Text to check:
+"{req.text}"
+
+Format your response exactly as JSON with these keys:
+- "corrected": "The grammatically correct version"
+- "native_alternative": "The native-sounding alternative"
+- "explanation": "Brief explanation in Indonesian"
+"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            response_format={ "type": "json_object" },
+            messages=[
+                {"role": "system", "content": "You are a helpful grammar assistant designed to output JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=500,
+            temperature=0.3
+        )
+        
+        content = response.choices[0].message.content
+        import json
+        return json.loads(content)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI Error: {str(e)}")
+
+@app.post("/api/transcribe")
+async def transcribe_audio(audio: UploadFile = File(...)):
+    import tempfile
+    import os
+    
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or api_key == "" or "isi_key_anda" in api_key.lower():
+        raise HTTPException(status_code=400, detail="API Key OpenAI belum diisi di file .env. Silakan buka file backend/.env dan masukkan API Key Anda.")
+
+    try:
+        # Save uploaded file to a temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as temp_audio:
+            content = await audio.read()
+            temp_audio.write(content)
+            temp_path = temp_audio.name
+
+        client = OpenAI(api_key=api_key)
+        
+        # Open the file and send to Whisper API
+        with open(temp_path, "rb") as audio_file:
+            transcription = client.audio.transcriptions.create(
+                model="whisper-1", 
+                file=audio_file,
+                language="en"
+            )
+        
+        # Clean up temp file
+        os.remove(temp_path)
+        
+        return {"text": transcription.text}
+        
+    except Exception as e:
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise HTTPException(status_code=500, detail=f"Transcription Error: {str(e)}")
+
+@app.post("/api/explain")
+def explain_concept(req: models.ExplainRequest):
+    import os
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key or api_key == "" or "isi_key_anda" in api_key.lower():
+        raise HTTPException(status_code=400, detail="API Key OpenAI belum diisi di file .env. Silakan buka file backend/.env dan masukkan API Key Anda.")
+
+    try:
+        client = OpenAI(api_key=api_key)
+        
+        prompt = f"""
+Anda adalah asisten dosen yang ahli menjelaskan konsep keuangan/teknis yang rumit kepada orang dewasa pemula.
+Tugas Anda adalah membaca paragraf bahasa Inggris yang membingungkan berikut, lalu menjelaskannya ke dalam bahasa Indonesia.
+Gunakan analogi kehidupan nyata (seperti warung kopi, bisnis sehari-hari, arisan, meminjam uang ke teman, dll) yang mudah dipahami, NAMUN PASTIKAN analogi tersebut 100% akurat secara teknis dan tidak menyesatkan. Jangan gunakan gaya bahasa yang terlalu kekanak-kanakan.
+
+Teks yang membingungkan:
+"{req.text}"
+
+Format jawaban Anda persis sebagai JSON dengan key berikut:
+- "analogy": "Penjelasan menggunakan analogi sehari-hari."
+- "technical_meaning": "Penjelasan teknisnya secara singkat dan padat."
+"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            response_format={ "type": "json_object" },
+            messages=[
+                {"role": "system", "content": "You are a helpful educational assistant designed to output JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=600,
+            temperature=0.4
+        )
+        
+        content = response.choices[0].message.content
+        import json
+        return json.loads(content)
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI Error: {str(e)}")
