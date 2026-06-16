@@ -39,6 +39,8 @@
   // Reading Mode Layout State
   let tocWidth = 320;
   let isResizing = false;
+  let companionWidth = 320;
+  let isResizingCompanion = false;
   let showCompanion = false;
   let showToc = true;
   let showHeader = true;
@@ -147,7 +149,7 @@
     pdfPage = page;
   }
 
-  // --- Resize Handlers ---
+  // --- Resize Handlers (TOC) ---
   function startResize(e) {
     isResizing = true;
     document.addEventListener('mousemove', handleResize);
@@ -166,6 +168,27 @@
     isResizing = false;
     document.removeEventListener('mousemove', handleResize);
     document.removeEventListener('mouseup', stopResize);
+  }
+
+  // --- Resize Handlers (Companion) ---
+  function startResizeCompanion(e) {
+    isResizingCompanion = true;
+    document.addEventListener('mousemove', handleResizeCompanion);
+    document.addEventListener('mouseup', stopResizeCompanion);
+  }
+  function handleResizeCompanion(e) {
+    if (isResizingCompanion) {
+      // 24px is the right padding of <main>
+      let newWidth = window.innerWidth - e.clientX - 24;
+      if (newWidth < 250) newWidth = 250;
+      if (newWidth > 800) newWidth = 800;
+      companionWidth = newWidth;
+    }
+  }
+  function stopResizeCompanion() {
+    isResizingCompanion = false;
+    document.removeEventListener('mousemove', handleResizeCompanion);
+    document.removeEventListener('mouseup', stopResizeCompanion);
   }
 
   function startTimer() {
@@ -289,7 +312,7 @@
   $: progressPercent = totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0;
 </script>
 
-<main class="h-screen min-h-[800px] bg-slate-950 font-sans text-slate-100 p-4 md:p-6 flex flex-col select-none" style="{isResizing ? 'cursor: col-resize;' : ''}">
+<main class="h-screen min-h-[800px] bg-slate-950 font-sans text-slate-100 p-4 md:p-6 flex flex-col select-none" style="{isResizing || isResizingCompanion ? 'cursor: col-resize;' : ''}">
   
   <!-- Top Navbar -->
   {#if showHeader}
@@ -651,7 +674,7 @@
     {/if}
 
     <!-- PDF Viewer -->
-    <section class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl flex flex-col h-full overflow-hidden relative flex-1" style="{isResizing ? 'pointer-events: none;' : ''}">
+    <section class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl flex flex-col h-full overflow-hidden relative flex-1" style="{isResizing || isResizingCompanion ? 'pointer-events: none;' : ''}">
       <div class="absolute top-3 left-3 z-10 flex gap-2">
         <button class="bg-slate-900/80 backdrop-blur border border-slate-700 p-2 rounded-lg shadow-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800 transition-colors pointer-events-auto" on:click={() => showToc = !showToc} title="Toggle Table of Contents">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
@@ -674,7 +697,12 @@
 
     <!-- Reading Companion Sidebar -->
     {#if showCompanion}
-      <section class="w-80 ml-4 bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col h-full overflow-hidden shrink-0 transition-all">
+      <!-- Resizer Handle for Companion -->
+      <div class="w-4 shrink-0 flex items-center justify-center cursor-col-resize group z-10 mx-1" on:mousedown={startResizeCompanion} title="Drag to resize">
+        <div class="w-1 h-12 bg-slate-700 rounded-full group-hover:bg-amber-500 transition-colors duration-300"></div>
+      </div>
+
+      <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col h-full overflow-hidden shrink-0 transition-all" style="width: {companionWidth}px;">
         <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Reading Companion</h2>
         
         <div class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-6">
