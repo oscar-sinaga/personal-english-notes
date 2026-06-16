@@ -1,0 +1,762 @@
+Level 1: Cover
+Level 1: Credit Intelligence & Modelling: Many Paths through the Forest of Credit Rating and Scoring
+Level 1: Copyright
+Level 1: Dedication
+Level 1: Foreword
+Level 2: Shifting Seas
+Level 2: The Toolkit
+Level 2: Forest Paths
+Level 1: Acknowledgements
+Level 1: Language & Syntax
+Level 2: Presentation—Warnings
+Level 2: Kindle e-Book—Warnings
+Level 1: Table of Contents
+Level 1: Module A: Introduction
+Level 1: 1: Credit Intelligence
+Level 2: 1.1 Debt versus Credit
+Level 2: 1.2 Intelligence!
+Level 3: 1.2.1 Individual Intelligence
+Level 3: 1.2.2 Collective Intelligence
+Level 3: 1.2.3 Intelligence Agencies
+Level 3: 1.2.4 Intelligence Cycle
+Level 2: 1.3 The Risk Lexicon
+Level 3: 1.3.1 What is . . .?
+Level 4: 1.3.1.1 Credit Intelligence
+Level 4: 1.3.1.2 Credit risk
+Level 3: 1.3.2 The Risk Universe
+Level 4: 1.3.2.1 Business Risk
+Level 4: 1.3.2.2 Risk by Nature
+Level 4: 1.3.2.3 Rumsfeld Matrix
+Level 4: 1.3.2.4 Black Swans and Other Strange Creatures
+Level 3: 1.3.3 Measure
+Level 4: 1.3.3.1 Assess, Measure, Communicate
+Level 4: 1.3.3.2 Time Horizons
+Level 4: 1.3.3.3 Desired Rating Properties
+Level 3: 1.3.4 Beware of Fallacies
+Level 4: 1.3.4.1 Argument
+Level 4: 1.3.4.2 Evidence
+Level 4: 1.3.4.3 Appeals
+Level 2: 1.4 The Moneylender
+Level 3: 1.4.1 Credit’s 5 Cs
+Level 3: 1.4.2 Borrowings and Structure
+Level 3: 1.4.3 Engagement
+Level 4: 1.4.3.1 Relationship Lending
+Level 4: 1.4.3.2 Transactional
+Level 4: 1.4.3.3 Providers—Benefits or Not
+Level 4: 1.4.3.4 Customers—Benefits or Not
+Level 3: 1.4.4 Retail versus Wholesale
+Level 4: 1.4.4.1 Wholesale
+Level 4: 1.4.4.2 Retail
+Level 4: 1.4.4.3 Grade Presentation
+Level 4: 1.4.4.4 From Rules and Judgment to Models
+Level 4: 1.4.4.5 Empirical Ratings
+Level 3: 1.4.5 Risk-Based Pricing (RBP)
+Level 2: 1.5 Summary
+Level 1: 2: Predictive Modelling Overview
+Level 2: 2.1 Models
+Level 3: 2.1.1 Model Types and Uses
+Level 3: 2.1.2 Choices and Elements
+Level 4: 2.1.2.1 Functional Form
+Level 4: 2.1.2.2 Methodology
+Level 4: 2.1.2.3 Parameter Estimation
+Level 3: 2.1.3 Model Lifecycle
+Level 2: 2.2 Model Risk (MR)
+Level 3: 2.2.1 Categories
+Level 3: 2.2.2 Management
+Level 3: 2.2.3 Models on Models
+Level 2: 2.3 Shock Events
+Level 3: 2.3.1 Past Events
+Level 3: 2.3.2 COVID-19 Views
+Level 2: 2.4 Data
+Level 3: 2.4.1 Desired Qualities
+Level 3: 2.4.2 Sources
+Level 4: 2.4.2.1 Homophily
+Level 3: 2.4.3 Types
+Level 4: 2.4.3.1 Honouring Obligations
+Level 4: 2.4.3.2 Transactions
+Level 4: 2.4.3.3 Non-Financial Behaviour
+Level 4: 2.4.3.4 Disclosed
+Level 4: 2.4.3.5 Investigation
+Level 4: 2.4.3.6 Providing Comfort
+Level 2: 2.5 Summary
+Level 1: 3: Retail Credit
+Level 2: 3.1 Scorecard Terminology
+Level 3: 3.1.1 Targeting Rare Events
+Level 3: 3.1.2 Functional Forms
+Level 2: 3.2 Retail Model Types
+Level 3: 3.2.1 When?—Credit Risk Management Cycle
+Level 3: 3.2.2 What?—The Four Rs of Customer Measurement
+Level 3: 3.2.3 Who?—Experience, To Borrow or Not To Borrow
+Level 3: 3.2.4 How?—Empirical versus Judgment
+Level 3: 3.2.5 The Commonest Types
+Level 2: 3.3 Data Sources
+Level 3: 3.3.1 Credit Bureaux
+Level 3: 3.3.2 Ownership Types
+Level 3: 3.3.3 Credit Registries
+Level 2: 3.4 Risk ‘Indicators’
+Level 3: 3.4.1 Types of Risk Indicators
+Level 3: 3.4.2 Banding Presentation
+Level 2: 3.5 FICO Scores
+Level 3: 3.5.1 Scaling Parameters
+Level 2: 3.6 Summary
+Level 1: 4: Business Credit
+Level 2: 4.1 Risk 101
+Level 3: 4.1.1 Credit Risk Analysis
+Level 3: 4.1.2 Data Sources
+Level 3: 4.1.3 Risk Assessment Tools
+Level 3: 4.1.4 Rating Grades
+Level 4: 4.1.4.1 External Grades
+Level 4: 4.1.4.2 Standard & Poor’s (S&P)
+Level 4: 4.1.4.3 Internal Grades
+Level 4: 4.1.4.4 Master Rating Scales
+Level 3: 4.1.5 SME (Small and Medium Enterprises) Lending
+Level 2: 4.2 Financial Ratio Scoring
+Level 3: 4.2.1 Pioneers
+Level 3: 4.2.2 Predictive Ratios
+Level 3: 4.2.3 Agency Usage
+Level 3: 4.2.4 Moody’s RiskCalcTM
+Level 3: 4.2.5 Non-Financial Factors
+Level 2: 4.3 Use of Forward-Looking Data
+Level 3: 4.3.1 Historical Analysis
+Level 3: 4.3.2 Structural Models
+Level 3: 4.3.3 Reduced-Form Models
+Level 4: 4.3.3.1 Credit Spreads
+Level 2: 4.4 Summary
+Level 2: Module B: The Histories
+Level 1: 5: Side Histories
+Level 2: 5.1 The Industrial Revolutions
+Level 3: 5.1.1 Authors and Players
+Level 3: 5.1.2 Further Details
+Level 3: 5.1.3 Implications
+Level 2: 5.2 Booms and Busts; Bubbles and Bursts
+Level 3: 5.2.1 17th Century
+Level 3: 5.2.2 18th Century
+Level 3: 5.2.3 19th Century
+Level 4: 5.2.3.1
+Level 4: 5.2.3.2 (1857–59) Panic of 1857
+Level 3: 5.2.4 (1873–96) The Long Depression
+Level 3: 5.2.5 20th Century
+Level 3: 5.2.6 21st Century
+Level 2: 5.3 Registration
+Level 3: 5.3.1 Social Relationships
+Level 4: 5.3.1.1 Hierarchies
+Level 4: 5.3.1.2 Obligations
+Level 3: 5.3.2 In History
+Level 4: 5.3.2.1 Ancient China
+Level 4: 5.3.2.2 Ancient Rome
+Level 4: 5.3.2.3. Early-Modern Europe
+Level 3: 5.3.3 Evidence
+Level 4: 5.3.3.1 Passports
+Level 4: 5.3.3.2 References
+Level 4: 5.3.3.3 Certificates
+Level 4: 5.3.3.4 Tokens
+Level 2: 5.4 Identification
+Level 3: 5.4.1 Visual
+Level 4: 5.4.1.1 Traces
+Level 4: 5.4.1.2 Worn and Borne
+Level 4: 5.4.1.3 Mannerisms
+Level 3: 5.4.2 Oral
+Level 4: 5.4.2.1 Voice
+Level 4: 5.4.2.2 Language and Accent
+Level 4: 5.4.2.3 Unique Knowledge
+Level 3: 5.4.3 Disclosed
+Level 4: 5.4.3.1 Names
+Level 4: 5.4.3.2 Numbers
+Level 3: 5.4.4 Authenticators
+Level 3: 5.4.5 Invasive
+Level 2: 5.5 Summary
+Level 1: 6: Credit—A Microhistory
+Level 2: 6.1 The Ancient World
+Level 3: 6.1.1 Mesopotamia
+Level 3: 6.1.2 Greece
+Level 3: 6.1.3 Roman Empire
+Level 2: 6.2 The Mediaeval World
+Level 3: 6.2.1 Early Middle Ages
+Level 3: 6.2.2 Churches and Holy Men
+Level 3: 6.2.3 Pawnbroking
+Level 3: 6.2.4 Vifgage and Morgage
+Level 3: 6.2.5 Merchant Banking
+Level 3: 6.2.6 Bankruptcy Legislation—16th through 18th Centuries
+Level 2: 6.3 Credit Evolution
+Level 3: 6.3.1 Trade Finance and Investment
+Level 3: 6.3.2 Personal Credit—Pre-1880
+Level 3: 6.3.3 Personal Credit—1880s Onwards
+Level 3: 6.3.4 Instalment Credit
+Level 2: 6.4 Credit Vendors
+Level 3: 6.4.1 Tallymen, Credit Drapers and Travelling Salesmen
+Level 3: 6.4.2 Department Stores
+Level 3: 6.4.3 Mail Order
+Level 3: 6.4.4 Mobile Network Operators (MNO)s
+Level 3: 6.4.5 Internet Service Providers
+Level 2: 6.5 Credit Media and Assets Financed
+Level 3: 6.5.1 Promissory Note and Bill of Exchange
+Level 3: 6.5.2 Cheques and Overdrafts
+Level 4: 6.5.2.1 Cheques
+Level 4: 6.5.2.2 Overdrafts
+Level 3: 6.5.3 Charge and Credit Cards
+Level 3: 6.5.4 Car Loans and Consumer Durables
+Level 3: 6.5.5 Home Loans
+Level 3: 6.5.6 Student Loans
+Level 2: 6.6 Summary and Reflections
+Level 2: Questions—History of Credit
+Level 1: 7: The Birth of Modern Credit Intelligence
+Level 2: 7.1 Pre-Revolution
+Level 2: 7.2 United Kingdom
+Level 2: 7.3 United States
+Level 3: 7.3.1 Early America
+Level 4: 7.3.1.1 Mercantile Reporting Agencies
+Level 4: 7.3.1.2 The Tappans
+Level 4: 7.3.1.3 Mercantile to 1859
+Level 4: 7.3.1.4 Dun versus Bradstreet to 1933
+Level 4: 7.3.1.5 19th-Century Operations
+Level 4: 7.3.1.6 Publishing and Rating
+Level 4: 7.3.1.7 Dun & Bradstreet
+Level 3: 7.3.2 Credit Men and Information Exchanges
+Level 3: 7.3.3 Credit Bureaux
+Level 2: 7.4 The ‘Big Three’ Credit Bureaux, Plus Some
+Level 3: 7.4.1 Equifax
+Level 3: 7.4.2 Experian
+Level 4: 7.4.2.1 Commercial Credit Nottingham (UK)
+Level 4: 7.4.2.2 Thompson Ramo Wooldridge (USA)
+Level 4: 7.4.2.3 Experian
+Level 3: 7.4.3 TransUnion
+Level 3: 7.4.4 Centrale Rischi Finanziari (CRIF)
+Level 3: 7.4.5 CreditInfo
+Level 3: 7.4.6 Others
+Level 3: 7.4.7 Current Spread
+Level 3: 7.4.8 Economics and Statistics
+Level 2: 7.5 Rating Agencies
+Level 2: 7.6 High-Level Observations
+Level 2: 7.7 Summary and Reflections
+Level 2: Questions—History of Credit Intelligence
+Level 1: 8: The Dawn of Credit Scoring
+Level 2: 8.1 Before Statistics
+Level 2: 8.2 Statistical Experiments: 1941–1958
+Level 2: 8.3 Rise of the Scorecard Vendor
+Level 3: 8.3.1 Fair, Isaac & Co. (FICO)
+Level 3: 8.3.2 VantageScore Solutions
+Level 3: 8.3.3 Management Decision Systems (MDS)
+Level 3: 8.3.4 Scorelink and Scorex
+Level 2: 8.4 Rise of the Corporate Modeller
+Level 3: 8.4.1 JP Morgan
+Level 3: 8.4.2 Kealhofer McQuown Vašícek (KMV)
+Level 3: 8.4.3 Moody’s Analytics
+Level 2: 8.5 Regulation
+Level 3: 8.5.1 Privacy—Fair Credit Reporting Act (FCRA) (1970)
+Level 3: 8.5.2 Privacy—OECD and European Legislation
+Level 3: 8.5.3 Anti-Discrimination Equal Credit Opportunity Act
+Level 3: 8.5.4 Capital Requirements—Basel II, III, IV
+Level 3: 8.5.5 Accounting—International Financial Reporting Standards (IFRS)
+Level 2: 8.6 Borrowed Concepts
+Level 2: 8.7 Statistical Methods
+Level 3: 8.7.1 Linear Programming (FICO)
+Level 3: 8.7.2 Discriminant Analysis
+Level 3: 8.7.3 Linear Probability Modelling (LPM)
+Level 3: 8.7.4 Logistic Regression (Independents and Others)
+Level 3: 8.7.5 Neural Networks
+Level 3: 8.7.6 Other Non-Parametric Techniques
+Level 2: 8.8 Summary and Reflections
+Level 2: Questions—History of Credit Scoring
+Level 2: Module C: Credit Lifecycle
+Level 2: Shared Service Centres (SSCs)
+Level 1: 9: Front-Door
+Level 2: 9.1 Marketing
+Level 3: 9.1.1 Advertising
+Level 3: 9.1.2 Two Tribes
+Level 3: 9.1.3 Pre-Screening
+Level 3: 9.1.4 Data
+Level 3: 9.1.5 Summary
+Level 2: Questions—Marketing
+Level 2: 9.2 Origination
+Level 3: 9.2.1 Gather—Interested Customer Details
+Level 4: 9.2.1.1 Acquire Applicant Details
+Level 4: 9.2.1.2 Paper-based capture
+Level 4: 9.2.1.3 Pre-scoring screening and sanitation
+Level 3: 9.2.2 Sort—Into Strategy Buckets
+Level 4: 9.2.2.1 Enquire—Internal
+Level 4: 9.2.2.2 Enquire—External
+Level 4: 9.2.2.3 Measure and Decide
+Level 3: 9.2.3 Action—Accept or Reject
+Level 4: 9.2.3.1 Declines
+Level 4: 9.2.3.2 Accepts
+Level 3: 9.2.4 Summary
+Level 2: Questions—Originations
+Level 2: 9.3 Account Management
+Level 3: 9.3.1 Types of Limits
+Level 4: 9.3.1.1 Use of Other Scores
+Level 4: 9.3.1.2 Triage
+Level 3: 9.3.2 Over-Limit Management (Takers)
+Level 4: 9.3.2.1 Cheque Accounts—Pay/No Pay
+Level 4: 9.3.2.2 Credit Cards—Authorizations
+Level 4: 9.2.3.3 Informed Customer Effect
+Level 3: 9.3.3 More Limit and Other Functions
+Level 4: 9.3.3.1 Limit-Increase Requests (Askers)
+Level 4: 9.3.3.2 Limit-Increase Campaigns (Givers)
+Level 4: 9.3.3.3 Limit Reviews (Repeaters)
+Level 4: 9.3.3.4 Cross-Sales (Repayers/Repeaters/Leavers)
+Level 4: 9.3.3.5 Win-Back (Leavers)
+Level 3: 9.3.4 Summary
+Level 2: Questions—Account Management
+Level 1: 10: Back-Door
+Level 2: 10.1 Collections and Recoveries (C&R)
+Level 3: 10.1.1 Overview
+Level 4: 10.1.1.1 Delinquency Reasons
+Level 4: 10.1.1.2 Excuses
+Level 3: 10.1.2 Process
+Level 4: 10.1.2.1 Core Systems Requirements
+Level 4: 10.1.2.2 Agencies
+Level 4: 10.1.2.3 Reporting
+Level 3: 10.1.3 Triggers and Strategies
+Level 4: 10.1.3.1 Strategy Setting
+Level 4: 10.1.3.2 Practical Considerations
+Level 3: 10.1.4 Modelling
+Level 4: 10.1.4.1 Collections and Recoveries (C&R) versus Behavioural
+Level 4: 10.1.4.2 Collections Scorecard Classifications
+Level 4: 10.1.4.3 Champion/Challenger
+Level 3: 10.1.5 Summary
+Level 2: Questions—Collections
+Level 2: 10.2 Fraud
+Level 3: 10.2.1 Credit Card Fraud Trends
+Level 3: 10.2.2 Definitions
+Level 4: 10.2.2.1 Relationship to Account
+Level 4: 10.2.2.1.1 Kite Flying
+Level 4: 10.2.2.2 Misrepresentation
+Level 5: 10.2.2.2.1 Embellishment/Massaging
+Level 5: 10.2.2.2.2 Social Engineering
+Level 5: 10.2.2.2.3 Identity Theft and Synthetic Identities
+Level 5: 10.2.2.2.4 Property Hijacking
+Level 5: 10.2.2.2.5 Advanced Persistent Threat
+Level 4: 10.2.2.3 Authorization
+Level 5: 10.2.2.3.1 Unauthorized Fraud
+Level 5: 10.2.2.3.2 Authorized Fraud
+Level 3: 10.2.3 Prevention Measures
+Level 4: 10.2.3.1 Manual/Physical Measures
+Level 4: 10.2.3.2 Online/Telephonic Measures
+Level 5: 10.2.3.2.1 Knowledge
+Level 5: 10.2.3.2.2 Visual Biometrics
+Level 5: 10.2.3.2.3 Other Biometrics
+Level 5: 10.2.3.2.4 Tokens
+Level 5: 10.2.3.2.5 Multi-Factor
+Level 3: 10.2.4 Data and Tools
+Level 3: 10.2.5 Summary
+Level 2: Questions—Fraud
+Level 2: Module D: Toolbox
+Level 1: 11: Stats & Maths & Unicorns
+Level 2: 11.1 Variance and Correlations
+Level 3: 11.1.1 Variance
+Level 3: 11.1.2 Pairwise Correlations
+Level 4: 11.1.2.1 Causation versus Coincidence
+Level 4: 11.1.2.2 Why are Correlations an Issue?
+Level 4: 11.1.2.3 Measures and Thresholds
+Level 4: 11.1.2.4 Variable Types
+Level 3: 11.1.3 Pearson’s Product-Moment
+Level 3: 11.1.4 Spearman’s Rank-Order
+Level 3: 11.1.5 Mahalanobis Distance
+Level 3: 11.1.6 Variance Inflation Factor (VIF)
+Level 4: 11.1.6.1 Greek, Damn Greek and Statistics
+Level 4: 11.2.1 Coefficient of Determination (R-squared
+Level 2: 11.2 Goodness-of Fit Tests
+Level 3: 11.2.1 Coefficient of Determination (R-squared)
+Level 3: 11.2.2 Pearson’s Chi-Square
+Level 3: 11.2.3 Hosmer–Lemeshow Statistic
+Level 2: 11.3 Likelihood
+Level 3: 11.3.1 Log-Likelihood
+Level 3: 11.3.2 Deviance
+Level 3: 11.3.3 Akaike Information Criterion (AIC)
+Level 3: 11.3.4 Bayesian Information Criterion (BIC)
+Level 2: 11.4 Holy Trinity
+Level 3: 11.4.1 Likelihood Ratio
+Level 4: 11.4.1.1 Wilks’ Theorem
+Level 4: 11.4.2 Wald Chi-Square
+Level 4: 11.4.3 Rao’s Score Chi-Square
+Level 2: 11.5 Summary
+Level 2: Questions—Stats & Maths & Unicorns
+Level 1: 12: Borrowed Measures
+Level 2: 12.1 Mathematics and Probability Theory
+Level 3: 12.1.1 Logarithms
+Level 4: 12.1.1.1 Archimedes
+Level 4: 12.1.1.2 Napier, Briggs and Bürgi
+Level 4: 12.1.1.3 Bernoulli and Euler
+Level 3: 12.1.2 Laws of Large Numbers
+Level 3: 12.1.3 Bayes’ Theorem
+Level 3: 12.1.4 Laplace—Expected Values
+Level 3: 12.1.5 Kolmogorov–Smirnov—Curve and Statistic
+Level 3: 12.1.6 Gradient Descent
+Level 2: 12.2 Probability Distributions and Hypotheses
+Level 3: 12.2.1 Binomial Distribution
+Level 3: 12.2.2 Normal Distribution and Z-Scores
+Level 3: 12.2.3 Student’s t-Distribution
+Level 3: 12.2.4 Verhulst’s Logistic Curve
+Level 3: 12.2.5 Pearson’s Chi-Square Distribution
+Level 2: 12.3 Economics
+Level 3: 12.3.1 Lorenz Curve
+Level 3: 12.3.2 Gini Coefficient
+Level 3: 12.3.3 Gini Impurity Index
+Level 2: 12.4 Information Theory and Cryptography
+Level 3: 12.4.1 Shannon’s Entropy
+Level 3: 12.4.2 Gudak—Weight of Evidence (WoE)
+Level 3: 12.4.3 Kullback—Divergence Statistic
+Level 2: 12.5 Signal-Detection Theory
+Level 3: 12.5.1 Confusion Matrices
+Level 3: 12.5.2 Receiver Operating Characteristic (ROC)
+Level 3: 12.5.3 Area under the ROC (AUROC or AUC)
+Level 2: 12.6 Forecasting
+Level 3: 12.6.1 Markov Chains
+Level 3: 12.6.2 Survival Analysis
+Level 2: 12.7 Summary
+Level 2: Questions—Borrowed Measures
+Level 1: 13: Practical Application
+Level 2: 13.1 Characteristic Transformations
+Level 3: 13.1.1 Rescale
+Level 3: 13.1.2 Discretize
+Level 4: 13.1.2.1 Dummy Variables
+Level 4: 13.1.2.2 Piecewise
+Level 4: 13.1.2.3 Weight of Evidence (WoE)
+Level 2: 13.2 Characteristic Assessments
+Level 3: 13.2.1 Information Value (IV)
+Level 3: 13.2.2 Population Stability Index (PSI)
+Level 3: 13.2.3 Chi-Square (.2)
+Level 2: 13.3 Model Assessments
+Level 3: 13.3.1 Lorenz and Gini
+Level 3: 13.3.2 Cumulative Accuracy Profile, Accuracy Ratio and Lift
+Level 3: 13.3.3 Divergence Statistic
+Level 2: 13.4 Odds and Sods
+Level 3: 13.4.1 Deviance Odds
+Level 3: 13.4.2 Calinski–Harabasz Statistic
+Level 3: 13.4.3 Gini Variance
+Level 2: 13.5 Summary
+Level 2: Questions—Power, Separation and Accuracy
+Level 1: 14: Predictive Modelling Techniques
+Level 2: 14.1 A View from on High!
+Level 3: 14.1.1 Caveats
+Level 3: 14.1.2 Learning the Language
+Level 2: 14.2 Parametric
+Level 3: 14.2.1 Linear Regression
+Level 3: 14.2.2 Discriminant Analysis
+Level 3: 14.2.3 Linear Probability Modelling (LPM)
+Level 3: 14.2.4 Probability Unit (Probit)
+Level 3: 14.2.5 Logistic Regression (Logit)
+Level 3: 14.2.6 Linear Programming
+Level 4: 14.2.6.1 LP for Classification
+Level 2: 14.3 Non-Parametric
+Level 3: 14.3.1 K-Nearest Neighbours
+Level 3: 14.3.2 Decision Trees
+Level 4: 14.3.2.1 Bootstrap Aggregation and Random Forests (RF)s
+Level 3: 14.3.3 Support Vector Machines (SVM)
+Level 3: 14.3.4 Artificial Neural Networks
+Level 3: 14.3.5 Genetic Algorithms
+Level 2: 14.4 Conglomerations
+Level 3: 14.4.1 Multiple Models
+Level 4: 14.4.1.1 Practical
+Level 4: 14.14.1.2 Parallel
+Level 4: 14.4.1.3 Sequential
+Level 3: 14.4.2 Machine Learning
+Level 2: 14.5 Making the Choice
+Level 2: 14.6 Summary
+Level 2: QUESTIONS—Predictive Modelling Techniques
+Level 2: Module E: Organizing
+Level 1: 15: Project Management
+Level 2: 15.1 Development Process Overview
+Level 3: 15.1.1 Initiation
+Level 3: 15.1.2 Preparation
+Level 3: 15.1.3 Construction
+Level 3: 15.1.4 Finalization
+Level 2: 15.2 Initiation and ‘Project Charter’
+Level 3: 15.2.1 High-Level
+Level 4: 15.2.1.1 Model register
+Level 3: 15.2.2 Making the Case
+Level 4: 15.2.2.1 Business Case
+Level 4: 15.2.2.2 Scope
+Level 4: 15.2.2.3 Assessment Criteria
+Level 3: 15.2.3 Stakeholders and Players
+Level 4: 15.2.3.1 Sponsor and Steering Committee
+Level 4: 15.2.3.2 Project Manager (PM)
+Level 4: 15.2.3.3 Team Lead (TL)
+Level 4: 15.2.3.4 Team Members
+Level 3: 15.2.4 Resources and Timetables
+Level 4: 15.2.4.1 Resources
+Level 4: 15.2.4.2 Project Timetable
+Level 3: 15.2.5 Assumptions, Risks and Constraints
+Level 4: 15.2.5.1 Target Specification
+Level 4: 15.2.5.2 Model Form
+Level 4: 15.2.5.3 Data Sources
+Level 4: 15.2.5.4 Environmental Instability
+Level 2: 15.3 Project Deliverables
+Level 3: 15.3.1 Communication and Documentation
+Level 3: 15.3.2 Model Development Documentation (MDD)
+Level 3: 15.3.3 Implementation Instructions (MIID)
+Level 3: 15.3.4 Project Code
+Level 3: 15.3.5 Data
+Level 2: 15.4 Other Considerations
+Level 3: 15.4.1 Scorecard Development Software
+Level 4: 15.4.1.1 Statistical Analysis System (SAS)
+Level 4: 15.4.1.2 World Programming System (WPS) Analytics
+Level 4: 15.4.1.3 Statistical Package for the Social Sciences (SPSS)
+Level 4: 15.4.1.4 R
+Level 4: 15.4.1.5 Python
+Level 4: 15.4.1.6 Other Proprietary Tools
+Level 3: 15.4.2 Implementation
+Level 4: 15.4.2.1 Decision-Making Stages
+Level 4: 15.4.2.2 Technology Options
+Level 4: 15.4.2.3 Vendors
+Level 3: 15.4.3 Next Steps
+Level 2: 15.5 Summary
+Level 1: 16: Data Acquisition—Observation
+Level 2: 16.1 Make a Plan!
+Level 2: 16.2 Gather
+Level 3: 16.2.1 Key Fields
+Level 3: 16.2.2 Matching Keys
+Level 3: 16.2.3 Data Aggregation
+Level 3: 16.2.4 Retention Rules
+Level 4: 16.2.4.1 Retrospective Histories
+Level 2: 16.3 Reduce
+Level 3: 16.3.1 Characteristic Review
+Level 3: 16.3.2 Proscribed Characteristics
+Level 3: 16.3.3 Unand Under-Populated Characteristics
+Level 3: 16.3.4 Correlated Characteristics
+Level 2: 16.4 Cleanse
+Level 3: 16.4.1 Out-of Scope
+Level 3: 16.4.2 Underpopulated
+Level 3: 16.4.3 Duplicates
+Level 3: 16.4.4 Outliers
+Level 3: 16.4.5 Inconsistencies
+Level 2: 16.5 Check
+Level 2: 16.6 Summary
+Level 1: 17: Data Acquisition—Performance
+Level 2: 17.1 Planning Extraction
+Level 3: 17.1.1 Minimum Requirements
+Level 3: 17.1.2 Casting the Net
+Level 3: 17.1.3 Basic Checks
+Level 2: 17.2 File Preparation and Review
+Level 3: 17.2.1 Deep Dives of Simple Sorts
+Level 3: 17.2.2 Performance Arrays
+Level 3: 17.2.3 Payment Profile Strings
+Level 3: 17.2.4 Performance Maintenance
+Level 2: 17.3 Window Setting
+Level 3: 17.3.1 Length
+Level 3: 17.3.2 End-of-versus Worst-of-Window
+Level 3: 17.3.3 Fixed vs Variable
+Level 2: 17.4 Summary
+Level 1: 18: Target Definition
+Level 2: 18.1 Overview
+Level 3: 18.1.1 Binaries
+Level 3: 18.1.2 Requirements
+Level 3: 18.1.3 Performance Components
+Level 3: 18.1.4 Code Crosschecks
+Level 2: 18.2 Definition Strictness
+Level 3: 18.2.1 Status nodes
+Level 3: 18.2.2 Level of Delinquency
+Level 4: 18.2.2.1 Time 0 vs Time 1
+Level 4: 18.2.2.2 Time 1 vs Time 2
+Level 3: 18.2.3 Trivial Balances
+Level 3: 18.2.4 Closed Accounts
+Level 2: 18.3 Integrity Checks
+Level 3: 18.3.1 Consistency Check
+Level 3: 18.3.2 Characteristic Check
+Level 3: 18.3.3 Swap-Set Check
+Level 2: 18.4 Summary
+Level 1: 19: File Assembly
+Level 2: 19.1 Merge Observation and Performance
+Level 3: 19.1.1 Finding Performance
+Level 3: 19.1.2 Outcome Field Merge
+Level 3: 19.1.3 Kill and Other Rules
+Level 3: 19.1.4 Not Taken Up (NTU), Uncashed
+Level 2: 19.2 External Data Acquisition
+Level 3: 19.2.1 Retro History Requests
+Level 3: 19.2.2 Data Security
+Level 2: 19.3 Further Reduction
+Level 3: 19.3.1 Pre-Processing
+Level 3: 19.3.2 Correlated Characteristics
+Level 4: 19.3.2.1 Weak Characteristics
+Level 2: 19.4 Summary
+Level 2: Module F: Packing
+Level 1: 20: Sample Selection
+Level 2: 20.1 Overview
+Level 3: 20.1.1 Terminology
+Level 3: 20.1.2 Optimal and Minimum Sample Sizes
+Level 3: 20.1.3 Law of Diminishing Data Returns
+Level 2: 20.2 Training, Holdout, Out-of Time Recent (THOR) Samples
+Level 3: 20.2.1 Sample Types
+Level 3: 20.2.2 Sampling Guidelines
+Level 4: 20.2.2.1 Training
+Level 4: 20.2.2.2 Hold-out
+Level 4: 20.2.2.3 Out-of Time
+Level 4: 20.2.2.4 Recent
+Level 3: 20.2.3 Observation Windows
+Level 3: 20.2.4 Sampling Plan and Outcome
+Level 2: 20.3 Afterthoughts
+Level 3: 20.3.1 Unand Under-Populated Characteristics
+Level 3: 20.3.2 Exact Random Sample
+Level 3: 20.3.3 Housekeeping
+Level 2: 20.4 Summary
+Level 1: 21: Data Transformation
+Level 2: 21.1 Traditional Transformations
+Level 3: 21.1.1 Dummy Variables
+Level 3: 21.1.2 Weight of Evidence
+Level 3: 21.1.3 Piecewise
+Level 2: 21.2 Classing/Binning
+Level 3: 21.2.1 Characteristic Analysis Reports
+Level 3: 21.2.2 Bulk Classing
+Level 3: 21.2.3 Fine Classing
+Level 3: 21.2.4 Coarse Classing
+Level 4: 21.2.4.1 Class Sizes
+Level 4: 21.2.4.2 Monotonicity
+Level 4: 21.2.4.3 Automation
+Level 4: 21.2.4.4 Training versus Hold-Out and Out-of Time
+Level 4: 21.2.4.5 Known versus Inferred
+Level 4: 21.2.4.6 Final Checks
+Level 3: 21.2.5 Piecewise Classing
+Level 3: 21.2.6 Final Transformation
+Level 2: 21.3 Missing Data Treatment
+Level 3: 21.3.1 Traditional
+Level 3: 21.3.2 Missing Singles
+Level 3: 21.3.3 Missing Multiples
+Level 2: 21.4 Summary
+Level 2: Questions—Data Transformation
+Level 1: 22: Segmentation
+Level 2: 22.1 Overview
+Level 3: 22.1.1 Drivers
+Level 4: 22.1.1.1 Common Splits
+Level 3: 22.1.2 Inhibitors
+Level 3: 22.1.3 Mitigators
+Level 2: 22.2 Analysis
+Level 3: 22.2.1 Learning Types
+Level 3: 22.2.2 Finding Interactions
+Level 4: Open versus closed form
+Level 4: Open form for binaries
+Level 4: Closed form for binaries
+Level 3: 22.2.3 Segment Mining
+Level 3: 22.2.4 Boundary Analysis
+Level 4: 22.2.4.1 Boundary Types
+Level 4: 22.2.4.2 An Example
+Level 2: 22.3 Presentation
+Level 2: 22.4 Summary
+Level 2: Questions—Segmentation
+Level 1: 23: Reject-Inference
+Level 2: 23.1 The Basics
+Level 3: 23.1.1 Pointers
+Level 3: 23.1.2 Missing at Random, or Not
+Level 3: 23.1.3 Terminology
+Level 3: 23.1.4 Characteristic Analysis
+Level 3: 23.1.5 Swap-SetAnalysis
+Level 4: 23.1.5.1 Score Level
+Level 4: 23.1.5.2 Characteristic Level
+Level 3: 23.1.6 Population-FlowDiagram
+Level 2: 23.2 Intermediate Models
+Level 3: 23.2.1 Accept/Reject
+Level 3: 23.2.2 Taken Up/Not Taken Up (TU/NTU)
+Level 3: 23.2.3 Known Good/Bad
+Level 3: 23.2.4 Bringing it All Together
+Level 2: 23.3 The Inference Smorgasbord
+Level 3: 23.3.1 Supplementation
+Level 3: 23.3.2 Performance Surrogates
+Level 4: 23.3.2.1 It’s a Bird, it’s a Plane; no, it’s . . . Super Model!
+Level 3: 23.3.3 Reject Equals Bad
+Level 3: 23.3.4 Augmentation
+Level 3: 23.3.5 Weight of Evidence (WoE) Adjustments
+Level 3: 23.3.6 Iterative Reclassification
+Level 3: 23.3.7 Extrapolation
+Level 2: 23.4 Favoured Technique
+Level 3: 23.4.1 Fuzzy-Parcelling
+Level 3: 23.4.2 Extrapolation
+Level 4: 23.4.2.1 Raw Inference
+Level 4: 23.4.2.2 Extra Prejudice
+Level 3: 23.4.3 Attribute-Level Adjustments
+Level 2: 23.5 Let’s Get Practical!
+Level 3: 23.5.1 Variable Names and Codes
+Level 3: 23.5.2 Record-Level Inference Example
+Level 2: 23.6 Summary
+Level 2: Questions—Reject-Inference
+Level 2: Module G: Making the Trip
+Level 1: 24: Model Training
+Level 2: 24.1 Regression
+Level 3: 24.1.1 Options and Settings
+Level 3: 24.1.2 Regression Outputs
+Level 2: 24.2 Variable Selection
+Level 3: 24.2.1 Criteria
+Level 3: 24.2.2 Automated Variable Selection (AVS)
+Level 3: 24.2.3 Stepwise Output Review
+Level 4: 24.2.3.1 Stepping Summary
+Level 4: 24.2.3.2 Model Coefficients
+Level 3: 24.2.4 Constraining the Beta Beast
+Level 4: 24.2.4.1 Negative Coefficients—Beta < 0
+Level 4: 24.2.4.2 Overprediction—Beta > 1
+Level 3: 24.2.5 Stepping by Gini
+Level 2: 24.3 Correlation and Multi-Collinearity
+Level 3: 24.3.1 Multi-Collinearity
+Level 3: 24.3.2 Pairwise Correlations
+Level 2: 24.4 Blockwise Variable Selection
+Level 3: 24.4.1 Variable Reduction Blocks
+Level 3: 24.4.2 Staged Blocks (Residual Prediction)
+Level 3: 24.4.3 Embedded Blocks
+Level 3: 24.4.4 Ensemble Blocks
+Level 2: 24.5 Multi-ModelComparisons
+Level 3: 24.5.1 Lorenz Curve Comparisons
+Level 3: 24.5.2 Strategy Curve Comparisons
+Level 2: 24.6 Model Calibration
+Level 3: 24.6.1 Simple Calibration
+Level 3: 24.6.2 Piecewise Calibration
+Level 3: 24.6.3 Score and Points CalibrationThe previous section assumes we are adjusting predictions provided
+Level 3: 24.6.4 MAPA Calibration
+Level 2: 24.7 Summary
+Level 2: Questions—Model Training
+Level 1: 25: Scaling and Banding
+Level 2: 25.1 Scorecard Scaling
+Level 3: 25.1.1 Background
+Level 3: 25.1.2 Percentages
+Level 3: 25.1.3 Fixed Ranges
+Level 3: 25.1.4 Scaling Parameters
+Level 4: 25.1.4.1 Basic Formulae
+Level 4: 25.1.4.2 Intercepts and Coefficients → Scorecard Points
+Level 4: 25.1.4.3 Log-Odds↔ Probability ↔ Score
+Level 3: 25.1.5 Other Considerations
+Level 4: 25.1.5.1 Scorecard Presentation
+Level 4: 25.1.5.2 Adverse Reason Codes
+Level 2: 25.2 Risk Banding
+Level 3: 25.2.1 Zero Constraints
+Level 3: 25.2.2 Fitted Distributions
+Level 3: 25.2.3 Benchmarked
+Level 3: 25.2.4 Fixed-BandBoundaries
+Level 2: 25.3 Summary
+Level 2: Questions—Scaling and Banding
+Level 1: 26: Finalization
+Level 2: 26.1 Validation
+Level 3: 26.1.1 High Level
+Level 3: 26.1.2 Independent Oversight
+Level 3: 26.1.3 Quantitative Assessment
+Level 3: 26.1.4 Assessing Misalignment
+Level 4: 26.1.4.1 Score Misalignments
+Level 4: 26.1.4.2 Characteristic Misalignment
+Level 2: 26.2 Documentation
+Level 3: 26.2.1 Possible Outline
+Level 3: 26.2.2 Supplementary Tables and Graphics
+Level 4: 26.2.2.1 Model Development
+Level 4: 26.2.2.2 Period-On-Period—Pre- and Post-implementation
+Level 3: 26.2.3 Selection Strategies
+Level 4: 26.2.3.1 Failure versus Rejection—That is the Question!
+Level 4: 26.2.3.2 Preparing for Post-implementation
+Level 3: 26.2.4 Comparing New Against Old
+Level 4: 26.2.4.1 Rating Transition Matrix
+Level 4: 26.2.4.2 Swap Sets
+Level 2: 26.3 Implementation
+Level 3: 26.3.1 Platform Choice
+Level 4: 26.3.1.1 Criticality
+Level 4: 26.3.1.2 Budget
+Level 3: 26.3.2 Testing
+Level 3: 26.3.3 Further Considerations
+Level 2: 26.4 Monitoring
+Level 3: 26.4.1 Front-End
+Level 4: 26.4.1.1 Overrides
+Level 3: 26.4.2 Back-End
+Level 4: 26.4.2.1 Vintage/Cohort Analysis
+Level 4: 26.4.2.2 Early Monitoring
+Level 2: 26.5 Summary
+Level 2: Questions—Finalization
+Level 1: Afterword
+Level 2: Areas for Further Research
+Level 2: Societal and Histories
+Level 2: Empirical
+Level 1: Module Z: Appendices
+Level 1: Glossary
+Level 1: Bibliography
+Level 1: Index
