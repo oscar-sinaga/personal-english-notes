@@ -10,6 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
+| 2026-06-16 16:35 | Implement Advanced Contextual Translation UI with Split Modes (Quick & Comprehensive) | `4e7e2d2` | ✅ Done |
 | 2026-06-16 15:10 | Migrate to full 3-column Credit Risk Dashboard and add Lexicon Bank | `15358e9` | ✅ Done |
 | 2026-06-16 14:55 | Migrate to TailwindCSS v4 and implement Level 3 interactive syllabus | `4950c63` | ✅ Done |
 | 2026-06-16 14:33 | Setup Svelte Frontend (Glassmorphism & FastAPI Integration) | `758dd00` | ✅ Done |
