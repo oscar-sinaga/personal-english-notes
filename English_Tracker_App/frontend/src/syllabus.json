@@ -1,0 +1,763 @@
+[
+  {
+    "id": "Module A: Introduction",
+    "name": "Module A: Introduction",
+    "children": [
+      {
+        "id": "1: Credit Intelligence",
+        "name": "1: Credit Intelligence",
+        "children": [
+          {
+            "id": "1.1 Debt versus Credit",
+            "name": "1.1 Debt versus Credit"
+          },
+          {
+            "id": "1.2 Intelligence!",
+            "name": "1.2 Intelligence!"
+          },
+          {
+            "id": "1.3 The Risk Lexicon",
+            "name": "1.3 The Risk Lexicon"
+          },
+          {
+            "id": "1.4 The Moneylender",
+            "name": "1.4 The Moneylender"
+          },
+          {
+            "id": "1.5 Summary",
+            "name": "1.5 Summary"
+          }
+        ]
+      },
+      {
+        "id": "2: Predictive Modelling Overview",
+        "name": "2: Predictive Modelling Overview",
+        "children": [
+          {
+            "id": "2.1 Models",
+            "name": "2.1 Models"
+          },
+          {
+            "id": "2.2 Model Risk (MR)",
+            "name": "2.2 Model Risk (MR)"
+          },
+          {
+            "id": "2.3 Shock Events",
+            "name": "2.3 Shock Events"
+          },
+          {
+            "id": "2.4 Data",
+            "name": "2.4 Data"
+          },
+          {
+            "id": "2.5 Summary",
+            "name": "2.5 Summary"
+          }
+        ]
+      },
+      {
+        "id": "3: Retail Credit",
+        "name": "3: Retail Credit",
+        "children": [
+          {
+            "id": "3.1 Scorecard Terminology",
+            "name": "3.1 Scorecard Terminology"
+          },
+          {
+            "id": "3.2 Retail Model Types",
+            "name": "3.2 Retail Model Types"
+          },
+          {
+            "id": "3.3 Data Sources",
+            "name": "3.3 Data Sources"
+          },
+          {
+            "id": "3.4 Risk \u2018Indicators\u2019",
+            "name": "3.4 Risk \u2018Indicators\u2019"
+          },
+          {
+            "id": "3.5 FICO Scores",
+            "name": "3.5 FICO Scores"
+          },
+          {
+            "id": "3.6 Summary",
+            "name": "3.6 Summary"
+          }
+        ]
+      },
+      {
+        "id": "4: Business Credit",
+        "name": "4: Business Credit",
+        "children": [
+          {
+            "id": "4.1 Risk 101",
+            "name": "4.1 Risk 101"
+          },
+          {
+            "id": "4.2 Financial Ratio Scoring",
+            "name": "4.2 Financial Ratio Scoring"
+          },
+          {
+            "id": "4.3 Use of Forward-Looking Data",
+            "name": "4.3 Use of Forward-Looking Data"
+          },
+          {
+            "id": "4.4 Summary",
+            "name": "4.4 Summary"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "Module B: The Histories",
+    "name": "Module B: The Histories",
+    "children": [
+      {
+        "id": "5: Side Histories",
+        "name": "5: Side Histories",
+        "children": [
+          {
+            "id": "5.1 The Industrial Revolutions",
+            "name": "5.1 The Industrial Revolutions"
+          },
+          {
+            "id": "5.2 Booms and Busts; Bubbles and Bursts",
+            "name": "5.2 Booms and Busts; Bubbles and Bursts"
+          },
+          {
+            "id": "5.3 Registration",
+            "name": "5.3 Registration"
+          },
+          {
+            "id": "5.4 Identification",
+            "name": "5.4 Identification"
+          },
+          {
+            "id": "5.5 Summary",
+            "name": "5.5 Summary"
+          }
+        ]
+      },
+      {
+        "id": "6: Credit\u2014A Microhistory",
+        "name": "6: Credit\u2014A Microhistory",
+        "children": [
+          {
+            "id": "6.1 The Ancient World",
+            "name": "6.1 The Ancient World"
+          },
+          {
+            "id": "6.2 The Mediaeval World",
+            "name": "6.2 The Mediaeval World"
+          },
+          {
+            "id": "6.3 Credit Evolution",
+            "name": "6.3 Credit Evolution"
+          },
+          {
+            "id": "6.4 Credit Vendors",
+            "name": "6.4 Credit Vendors"
+          },
+          {
+            "id": "6.5 Credit Media and Assets Financed",
+            "name": "6.5 Credit Media and Assets Financed"
+          },
+          {
+            "id": "6.6 Summary and Reflections",
+            "name": "6.6 Summary and Reflections"
+          }
+        ]
+      },
+      {
+        "id": "7: The Birth of Modern Credit Intelligence",
+        "name": "7: The Birth of Modern Credit Intelligence",
+        "children": [
+          {
+            "id": "7.1 Pre-Revolution",
+            "name": "7.1 Pre-Revolution"
+          },
+          {
+            "id": "7.2 United Kingdom",
+            "name": "7.2 United Kingdom"
+          },
+          {
+            "id": "7.3 United States",
+            "name": "7.3 United States"
+          },
+          {
+            "id": "7.4 The \u2018Big Three\u2019 Credit Bureaux, Plus Some",
+            "name": "7.4 The \u2018Big Three\u2019 Credit Bureaux, Plus Some"
+          },
+          {
+            "id": "7.5 Rating Agencies",
+            "name": "7.5 Rating Agencies"
+          },
+          {
+            "id": "7.6 High-Level Observations",
+            "name": "7.6 High-Level Observations"
+          },
+          {
+            "id": "7.7 Summary and Reflections",
+            "name": "7.7 Summary and Reflections"
+          }
+        ]
+      },
+      {
+        "id": "8: The Dawn of Credit Scoring",
+        "name": "8: The Dawn of Credit Scoring",
+        "children": [
+          {
+            "id": "8.1 Before Statistics",
+            "name": "8.1 Before Statistics"
+          },
+          {
+            "id": "8.2 Statistical Experiments: 1941\u20131958",
+            "name": "8.2 Statistical Experiments: 1941\u20131958"
+          },
+          {
+            "id": "8.3 Rise of the Scorecard Vendor",
+            "name": "8.3 Rise of the Scorecard Vendor"
+          },
+          {
+            "id": "8.4 Rise of the Corporate Modeller",
+            "name": "8.4 Rise of the Corporate Modeller"
+          },
+          {
+            "id": "8.5 Regulation",
+            "name": "8.5 Regulation"
+          },
+          {
+            "id": "8.6 Borrowed Concepts",
+            "name": "8.6 Borrowed Concepts"
+          },
+          {
+            "id": "8.7 Statistical Methods",
+            "name": "8.7 Statistical Methods"
+          },
+          {
+            "id": "8.8 Summary and Reflections",
+            "name": "8.8 Summary and Reflections"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "Module C: Credit Lifecycle",
+    "name": "Module C: Credit Lifecycle",
+    "children": [
+      {
+        "id": "9: Front-Door",
+        "name": "9: Front-Door",
+        "children": [
+          {
+            "id": "9.1 Marketing",
+            "name": "9.1 Marketing"
+          },
+          {
+            "id": "9.2 Origination",
+            "name": "9.2 Origination"
+          },
+          {
+            "id": "9.3 Account Management",
+            "name": "9.3 Account Management"
+          }
+        ]
+      },
+      {
+        "id": "10: Back-Door",
+        "name": "10: Back-Door",
+        "children": [
+          {
+            "id": "10.1 Collections and Recoveries (C&R)",
+            "name": "10.1 Collections and Recoveries (C&R)"
+          },
+          {
+            "id": "10.2 Fraud",
+            "name": "10.2 Fraud"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "Module D: Toolbox",
+    "name": "Module D: Toolbox",
+    "children": [
+      {
+        "id": "11: Stats & Maths & Unicorns",
+        "name": "11: Stats & Maths & Unicorns",
+        "children": [
+          {
+            "id": "11.1 Variance and Correlations",
+            "name": "11.1 Variance and Correlations"
+          },
+          {
+            "id": "11.2 Goodness-of Fit Tests",
+            "name": "11.2 Goodness-of Fit Tests"
+          },
+          {
+            "id": "11.3 Likelihood",
+            "name": "11.3 Likelihood"
+          },
+          {
+            "id": "11.4 Holy Trinity",
+            "name": "11.4 Holy Trinity"
+          },
+          {
+            "id": "11.5 Summary",
+            "name": "11.5 Summary"
+          }
+        ]
+      },
+      {
+        "id": "12: Borrowed Measures",
+        "name": "12: Borrowed Measures",
+        "children": [
+          {
+            "id": "12.1 Mathematics and Probability Theory",
+            "name": "12.1 Mathematics and Probability Theory"
+          },
+          {
+            "id": "12.2 Probability Distributions and Hypotheses",
+            "name": "12.2 Probability Distributions and Hypotheses"
+          },
+          {
+            "id": "12.3 Economics",
+            "name": "12.3 Economics"
+          },
+          {
+            "id": "12.4 Information Theory and Cryptography",
+            "name": "12.4 Information Theory and Cryptography"
+          },
+          {
+            "id": "12.5 Signal-Detection Theory",
+            "name": "12.5 Signal-Detection Theory"
+          },
+          {
+            "id": "12.6 Forecasting",
+            "name": "12.6 Forecasting"
+          },
+          {
+            "id": "12.7 Summary",
+            "name": "12.7 Summary"
+          }
+        ]
+      },
+      {
+        "id": "13: Practical Application",
+        "name": "13: Practical Application",
+        "children": [
+          {
+            "id": "13.1 Characteristic Transformations",
+            "name": "13.1 Characteristic Transformations"
+          },
+          {
+            "id": "13.2 Characteristic Assessments",
+            "name": "13.2 Characteristic Assessments"
+          },
+          {
+            "id": "13.3 Model Assessments",
+            "name": "13.3 Model Assessments"
+          },
+          {
+            "id": "13.4 Odds and Sods",
+            "name": "13.4 Odds and Sods"
+          },
+          {
+            "id": "13.5 Summary",
+            "name": "13.5 Summary"
+          }
+        ]
+      },
+      {
+        "id": "14: Predictive Modelling Techniques",
+        "name": "14: Predictive Modelling Techniques",
+        "children": [
+          {
+            "id": "14.1 A View from on High!",
+            "name": "14.1 A View from on High!"
+          },
+          {
+            "id": "14.2 Parametric",
+            "name": "14.2 Parametric"
+          },
+          {
+            "id": "14.3 Non-Parametric",
+            "name": "14.3 Non-Parametric"
+          },
+          {
+            "id": "14.4 Conglomerations",
+            "name": "14.4 Conglomerations"
+          },
+          {
+            "id": "14.5 Making the Choice",
+            "name": "14.5 Making the Choice"
+          },
+          {
+            "id": "14.6 Summary",
+            "name": "14.6 Summary"
+          },
+          {
+            "id": "QUESTIONS\u2014Predictive Modelling Techniques",
+            "name": "QUESTIONS\u2014Predictive Modelling Techniques"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "Module E: Organizing",
+    "name": "Module E: Organizing",
+    "children": [
+      {
+        "id": "15: Project Management",
+        "name": "15: Project Management",
+        "children": [
+          {
+            "id": "15.1 Development Process Overview",
+            "name": "15.1 Development Process Overview"
+          },
+          {
+            "id": "15.2 Initiation and \u2018Project Charter\u2019",
+            "name": "15.2 Initiation and \u2018Project Charter\u2019"
+          },
+          {
+            "id": "15.3 Project Deliverables",
+            "name": "15.3 Project Deliverables"
+          },
+          {
+            "id": "15.4 Other Considerations",
+            "name": "15.4 Other Considerations"
+          },
+          {
+            "id": "15.5 Summary",
+            "name": "15.5 Summary"
+          }
+        ]
+      },
+      {
+        "id": "16: Data Acquisition\u2014Observation",
+        "name": "16: Data Acquisition\u2014Observation",
+        "children": [
+          {
+            "id": "16.1 Make a Plan!",
+            "name": "16.1 Make a Plan!"
+          },
+          {
+            "id": "16.2 Gather",
+            "name": "16.2 Gather"
+          },
+          {
+            "id": "16.3 Reduce",
+            "name": "16.3 Reduce"
+          },
+          {
+            "id": "16.4 Cleanse",
+            "name": "16.4 Cleanse"
+          },
+          {
+            "id": "16.5 Check",
+            "name": "16.5 Check"
+          },
+          {
+            "id": "16.6 Summary",
+            "name": "16.6 Summary"
+          }
+        ]
+      },
+      {
+        "id": "17: Data Acquisition\u2014Performance",
+        "name": "17: Data Acquisition\u2014Performance",
+        "children": [
+          {
+            "id": "17.1 Planning Extraction",
+            "name": "17.1 Planning Extraction"
+          },
+          {
+            "id": "17.2 File Preparation and Review",
+            "name": "17.2 File Preparation and Review"
+          },
+          {
+            "id": "17.3 Window Setting",
+            "name": "17.3 Window Setting"
+          },
+          {
+            "id": "17.4 Summary",
+            "name": "17.4 Summary"
+          }
+        ]
+      },
+      {
+        "id": "18: Target Definition",
+        "name": "18: Target Definition",
+        "children": [
+          {
+            "id": "18.1 Overview",
+            "name": "18.1 Overview"
+          },
+          {
+            "id": "18.2 Definition Strictness",
+            "name": "18.2 Definition Strictness"
+          },
+          {
+            "id": "18.3 Integrity Checks",
+            "name": "18.3 Integrity Checks"
+          },
+          {
+            "id": "18.4 Summary",
+            "name": "18.4 Summary"
+          }
+        ]
+      },
+      {
+        "id": "19: File Assembly",
+        "name": "19: File Assembly",
+        "children": [
+          {
+            "id": "19.1 Merge Observation and Performance",
+            "name": "19.1 Merge Observation and Performance"
+          },
+          {
+            "id": "19.2 External Data Acquisition",
+            "name": "19.2 External Data Acquisition"
+          },
+          {
+            "id": "19.3 Further Reduction",
+            "name": "19.3 Further Reduction"
+          },
+          {
+            "id": "19.4 Summary",
+            "name": "19.4 Summary"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "Module F: Packing",
+    "name": "Module F: Packing",
+    "children": [
+      {
+        "id": "20: Sample Selection",
+        "name": "20: Sample Selection",
+        "children": [
+          {
+            "id": "20.1 Overview",
+            "name": "20.1 Overview"
+          },
+          {
+            "id": "20.2 Training, Holdout, Out-of Time Recent (THOR) Samples",
+            "name": "20.2 Training, Holdout, Out-of Time Recent (THOR) Samples"
+          },
+          {
+            "id": "20.3 Afterthoughts",
+            "name": "20.3 Afterthoughts"
+          },
+          {
+            "id": "20.4 Summary",
+            "name": "20.4 Summary"
+          }
+        ]
+      },
+      {
+        "id": "21: Data Transformation",
+        "name": "21: Data Transformation",
+        "children": [
+          {
+            "id": "21.1 Traditional Transformations",
+            "name": "21.1 Traditional Transformations"
+          },
+          {
+            "id": "21.2 Classing/Binning",
+            "name": "21.2 Classing/Binning"
+          },
+          {
+            "id": "21.3 Missing Data Treatment",
+            "name": "21.3 Missing Data Treatment"
+          },
+          {
+            "id": "21.4 Summary",
+            "name": "21.4 Summary"
+          }
+        ]
+      },
+      {
+        "id": "22: Segmentation",
+        "name": "22: Segmentation",
+        "children": [
+          {
+            "id": "22.1 Overview",
+            "name": "22.1 Overview"
+          },
+          {
+            "id": "22.2 Analysis",
+            "name": "22.2 Analysis"
+          },
+          {
+            "id": "22.3 Presentation",
+            "name": "22.3 Presentation"
+          },
+          {
+            "id": "22.4 Summary",
+            "name": "22.4 Summary"
+          }
+        ]
+      },
+      {
+        "id": "23: Reject-Inference",
+        "name": "23: Reject-Inference",
+        "children": [
+          {
+            "id": "23.1 The Basics",
+            "name": "23.1 The Basics"
+          },
+          {
+            "id": "23.2 Intermediate Models",
+            "name": "23.2 Intermediate Models"
+          },
+          {
+            "id": "23.3 The Inference Smorgasbord",
+            "name": "23.3 The Inference Smorgasbord"
+          },
+          {
+            "id": "23.4 Favoured Technique",
+            "name": "23.4 Favoured Technique"
+          },
+          {
+            "id": "23.5 Let\u2019s Get Practical!",
+            "name": "23.5 Let\u2019s Get Practical!"
+          },
+          {
+            "id": "23.6 Summary",
+            "name": "23.6 Summary"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "Module G: Making the Trip",
+    "name": "Module G: Making the Trip",
+    "children": [
+      {
+        "id": "24: Model Training",
+        "name": "24: Model Training",
+        "children": [
+          {
+            "id": "24.1 Regression",
+            "name": "24.1 Regression"
+          },
+          {
+            "id": "24.2 Variable Selection",
+            "name": "24.2 Variable Selection"
+          },
+          {
+            "id": "24.3 Correlation and Multi-Collinearity",
+            "name": "24.3 Correlation and Multi-Collinearity"
+          },
+          {
+            "id": "24.4 Blockwise Variable Selection",
+            "name": "24.4 Blockwise Variable Selection"
+          },
+          {
+            "id": "24.5 Multi-ModelComparisons",
+            "name": "24.5 Multi-ModelComparisons"
+          },
+          {
+            "id": "24.6 Model Calibration",
+            "name": "24.6 Model Calibration"
+          },
+          {
+            "id": "24.7 Summary",
+            "name": "24.7 Summary"
+          }
+        ]
+      },
+      {
+        "id": "25: Scaling and Banding",
+        "name": "25: Scaling and Banding",
+        "children": [
+          {
+            "id": "25.1 Scorecard Scaling",
+            "name": "25.1 Scorecard Scaling"
+          },
+          {
+            "id": "25.2 Risk Banding",
+            "name": "25.2 Risk Banding"
+          },
+          {
+            "id": "25.3 Summary",
+            "name": "25.3 Summary"
+          }
+        ]
+      },
+      {
+        "id": "26: Finalization",
+        "name": "26: Finalization",
+        "children": [
+          {
+            "id": "26.1 Validation",
+            "name": "26.1 Validation"
+          },
+          {
+            "id": "26.2 Documentation",
+            "name": "26.2 Documentation"
+          },
+          {
+            "id": "26.3 Implementation",
+            "name": "26.3 Implementation"
+          },
+          {
+            "id": "26.4 Monitoring",
+            "name": "26.4 Monitoring"
+          },
+          {
+            "id": "26.5 Summary",
+            "name": "26.5 Summary"
+          }
+        ]
+      },
+      {
+        "id": "Afterword",
+        "name": "Afterword",
+        "children": [
+          {
+            "id": "Areas for Further Research",
+            "name": "Areas for Further Research"
+          },
+          {
+            "id": "Societal and Histories",
+            "name": "Societal and Histories"
+          },
+          {
+            "id": "Empirical",
+            "name": "Empirical"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "Module Z: Appendices",
+    "name": "Module Z: Appendices",
+    "children": [
+      {
+        "id": "Glossary",
+        "name": "Glossary",
+        "children": []
+      },
+      {
+        "id": "Bibliography",
+        "name": "Bibliography",
+        "children": []
+      },
+      {
+        "id": "Index",
+        "name": "Index",
+        "children": []
+      }
+    ]
+  }
+]
