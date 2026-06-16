@@ -10,6 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
+| 2026-06-16 14:33 | Setup Svelte Frontend (Glassmorphism & FastAPI Integration) | `758dd00` | ✅ Done |
 | 2026-06-16 14:26 | Setup Backend FastAPI (via UV) & desain arsitektur Web App (Svelte) | `25fb586` | ✅ Done |
 | 2026-06-16 14:13 | Breakdown Silabus (Level 3) dari PDF Credit Intelligence | `25fb586` | ✅ Done |
 | 2026-06-15 20:37 | Mencatat proyeksi waktu belajar (fase 1-3) untuk Split Profile (The 60-Minute Plan) | `ae7801d` | ✅ Done |
