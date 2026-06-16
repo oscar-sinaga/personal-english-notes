@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Boolean, Text
+from pydantic import BaseModel
 from database import Base
 
 class ModuleProgress(Base):
@@ -7,6 +8,14 @@ class ModuleProgress(Base):
     id = Column(Integer, primary_key=True, index=True)
     module_name = Column(String, unique=True, index=True)
     is_completed = Column(Boolean, default=False)
+
+class DoubtExport(BaseModel):
+    topic_folder: str
+    pillar: str
+    content: str
+
+class TranslateRequest(BaseModel):
+    text: str
 
 class Vocabulary(Base):
     __tablename__ = "vocabulary"
