@@ -402,6 +402,7 @@ def explain_concept(req: models.ExplainRequest):
         raise HTTPException(status_code=400, detail="API Key OpenAI belum diisi di file .env. Silakan buka file backend/.env dan masukkan API Key Anda.")
 
     try:
+        from fastapi.responses import StreamingResponse
         client = OpenAI(api_key=api_key)
         
         prompt = f"""
@@ -411,27 +412,37 @@ Tugas Anda adalah membaca kalimat/paragraf bahasa Inggris teknis berikut, lalu m
 Teks yang membingungkan:
 "{req.text}"
 
-Format jawaban Anda persis sebagai JSON dengan key berikut:
-- "core_concept": "JANGAN hanya menerjemahkan teksnya! Berikan penjelasan yang komprehensif, mendalam, namun menggunakan bahasa Indonesia yang sangat mudah dipahami tentang apa sebenarnya maksud dari konsep di balik teks tersebut. Bongkar jargon-jargonnya."
-- "practical_example": "Satu contoh skenario penerapan di dunia nyata/bisnis dalam bahasa INDONESIA."
-- "analogy": "Sebuah analogi kreatif dan cerdas (tidak harus warung kopi, bisa apa saja yang relevan) untuk mengilustrasikan konsep tersebut agar menempel di otak."
-- "english_explanation": "Berikan penjelasan (explanation) komprehensif mengenai konsep tersebut, TETAPI ditulis murni dalam bahasa INGGRIS yang sederhana (Intermediate B1/B2 level). Terkadang penjelasan dalam bahasa Inggris lebih mudah ditangkap maknanya."
+WAJIB FORMAT JAWABAN ANDA DENGAN TEPAT 4 BAGIAN MENGGUNAKAN TAG BERIKUT (Tulis persis tag-nya):
+
+[CORE_CONCEPT]
+JANGAN hanya menerjemahkan teksnya! Berikan penjelasan yang komprehensif, mendalam, namun menggunakan bahasa Indonesia yang sangat mudah dipahami tentang apa sebenarnya maksud dari konsep di balik teks tersebut. Bongkar jargon-jargonnya.
+
+[PRACTICAL_EXAMPLE]
+Satu contoh skenario penerapan di dunia nyata/bisnis dalam bahasa INDONESIA.
+
+[ANALOGY]
+Sebuah analogi kreatif dan cerdas (tidak harus warung kopi, bisa apa saja yang relevan) untuk mengilustrasikan konsep tersebut agar menempel di otak.
+
+[ENGLISH_EXPLANATION]
+Berikan penjelasan (explanation) komprehensif mengenai konsep tersebut, TETAPI ditulis murni dalam bahasa INGGRIS yang sederhana (Intermediate B1/B2 level). Terkadang penjelasan dalam bahasa Inggris lebih mudah ditangkap maknanya.
 """
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            response_format={ "type": "json_object" },
-            messages=[
-                {"role": "system", "content": "You are a helpful educational assistant designed to output JSON."},
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=600,
-            temperature=0.4
-        )
-        
-        content = response.choices[0].message.content
-        import json
-        return json.loads(content)
+        def stream_generator():
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are a helpful educational assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=800,
+                temperature=0.4,
+                stream=True
+            )
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
+
+        return StreamingResponse(stream_generator(), media_type="text/event-stream")
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OpenAI Error: {str(e)}")

@@ -370,19 +370,46 @@
   async function explainDoubt() {
     if (!doubtContent || !doubtContent.trim()) return;
     isExplaining = true;
-    explainResult = null;
+    explainResult = { core_concept: "", practical_example: "", analogy: "", english_explanation: "" };
     doubtStatus = "Casting Magic Explain...";
+    let rawText = "";
+
     try {
       const res = await fetch(`${API_URL}/explain`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: doubtContent })
       });
-      const data = await res.json();
-      explainResult = data;
+      
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        rawText += decoder.decode(value, { stream: true });
+        
+        const extractSection = (startTag, endTag) => {
+          const start = rawText.indexOf(startTag);
+          if (start === -1) return "";
+          const contentStart = start + startTag.length;
+          let end = endTag ? rawText.indexOf(endTag, contentStart) : -1;
+          if (end === -1) end = rawText.length;
+          return rawText.substring(contentStart, end).trim();
+        };
+
+        explainResult = {
+          core_concept: extractSection("[CORE_CONCEPT]", "[PRACTICAL_EXAMPLE]"),
+          practical_example: extractSection("[PRACTICAL_EXAMPLE]", "[ANALOGY]"),
+          analogy: extractSection("[ANALOGY]", "[ENGLISH_EXPLANATION]"),
+          english_explanation: extractSection("[ENGLISH_EXPLANATION]", null)
+        };
+      }
+      
       doubtStatus = "Magic complete!";
       setTimeout(() => { doubtStatus = "" }, 3000);
     } catch (e) {
+      console.error(e);
       doubtStatus = "Magic failed.";
       setTimeout(() => { doubtStatus = "" }, 3000);
     } finally {
