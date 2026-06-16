@@ -1068,14 +1068,22 @@
 
             <!-- Beautiful Explain Result UI -->
             {#if explainResult}
-              <div class="mt-4 p-4 bg-fuchsia-950/20 border border-fuchsia-800 rounded-lg shadow-[0_0_15px_rgba(192,38,211,0.1)]">
-                <div class="mb-3">
-                  <span class="text-[10px] font-bold text-fuchsia-400 uppercase tracking-wider flex items-center gap-1 mb-1">🪄 Analogi Ringan</span>
-                  <p class="text-[11px] text-slate-200 leading-relaxed bg-fuchsia-900/30 p-2 rounded border-l-2 border-fuchsia-500">{explainResult.analogy}</p>
+              <div class="mt-4 p-4 bg-fuchsia-950/20 border border-fuchsia-800 rounded-lg shadow-[0_0_15px_rgba(192,38,211,0.1)] flex flex-col gap-3">
+                <div>
+                  <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1 mb-1">🎯 Core Concept (ID)</span>
+                  <p class="text-[11px] text-slate-200 leading-relaxed">{explainResult.core_concept}</p>
                 </div>
                 <div>
-                  <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1 mb-1">⚙️ Makna Teknis</span>
-                  <p class="text-[11px] text-slate-300 leading-relaxed">{explainResult.technical_meaning}</p>
+                  <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1 mb-1">💼 Practical Example (ID)</span>
+                  <p class="text-[11px] text-slate-300 leading-relaxed bg-amber-950/30 p-2 rounded border-l-2 border-amber-500">{explainResult.practical_example}</p>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1 mb-1">💡 Smart Analogy</span>
+                  <p class="text-[11px] text-slate-300 leading-relaxed bg-emerald-950/30 p-2 rounded border-l-2 border-emerald-500">{explainResult.analogy}</p>
+                </div>
+                <div>
+                  <span class="text-[10px] font-bold text-fuchsia-400 uppercase tracking-wider flex items-center gap-1 mb-1">🇬🇧 English Explanation</span>
+                  <p class="text-[11px] text-slate-300 leading-relaxed italic bg-fuchsia-900/30 p-2 rounded border-l-2 border-fuchsia-500">{explainResult.english_explanation}</p>
                 </div>
               </div>
             {/if}

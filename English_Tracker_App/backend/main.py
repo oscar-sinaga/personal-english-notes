@@ -405,16 +405,17 @@ def explain_concept(req: models.ExplainRequest):
         client = OpenAI(api_key=api_key)
         
         prompt = f"""
-Anda adalah asisten dosen yang ahli menjelaskan konsep keuangan/teknis yang rumit kepada orang dewasa pemula.
-Tugas Anda adalah membaca paragraf bahasa Inggris yang membingungkan berikut, lalu menjelaskannya ke dalam bahasa Indonesia.
-Gunakan analogi kehidupan nyata (seperti warung kopi, bisnis sehari-hari, arisan, meminjam uang ke teman, dll) yang mudah dipahami, NAMUN PASTIKAN analogi tersebut 100% akurat secara teknis dan tidak menyesatkan. Jangan gunakan gaya bahasa yang terlalu kekanak-kanakan.
+Anda adalah Senior Analyst yang sedang membimbing rekan kerja junior (non-Native Speaker).
+Tugas Anda adalah membaca kalimat/paragraf bahasa Inggris teknis berikut, lalu membedahnya agar mudah dipahami, baik secara konsep maupun kebahasaan.
 
 Teks yang membingungkan:
 "{req.text}"
 
 Format jawaban Anda persis sebagai JSON dengan key berikut:
-- "analogy": "Penjelasan menggunakan analogi sehari-hari."
-- "technical_meaning": "Penjelasan teknisnya secara singkat dan padat."
+- "core_concept": "JANGAN hanya menerjemahkan teksnya! Berikan penjelasan yang komprehensif, mendalam, namun menggunakan bahasa Indonesia yang sangat mudah dipahami tentang apa sebenarnya maksud dari konsep di balik teks tersebut. Bongkar jargon-jargonnya."
+- "practical_example": "Satu contoh skenario penerapan di dunia nyata/bisnis dalam bahasa INDONESIA."
+- "analogy": "Sebuah analogi kreatif dan cerdas (tidak harus warung kopi, bisa apa saja yang relevan) untuk mengilustrasikan konsep tersebut agar menempel di otak."
+- "english_explanation": "Berikan penjelasan (explanation) komprehensif mengenai konsep tersebut, TETAPI ditulis murni dalam bahasa INGGRIS yang sederhana (Intermediate B1/B2 level). Terkadang penjelasan dalam bahasa Inggris lebih mudah ditangkap maknanya."
 """
 
         response = client.chat.completions.create(
