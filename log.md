@@ -10,6 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
+| 2026-06-17 00:10 | Implement streaming for Magic Explain using plain text chunks | `470134a` | ✅ Done |
 | 2026-06-17 00:02 | Refine Magic Explain to use 4-part split: core concept, practical example, smart analogy, and english explanation | `b9818a3` | ✅ Done |
 | 2026-06-16 23:38 | Add AI Speaking Tutor (Whisper), ELI5 Magic Reading Assistant, Grammar Checker, and Weekly Progress Chart | `d6e9838` | ✅ Done |
 | 2026-06-16 16:37 | Make Reading Companion (Right Sidebar) resizable | `599f705` | ✅ Done |
@@ -79,4 +80,4 @@
 5. **Menunda Pembuatan Personal English Tracker App**. (2026-06-07): User memutuskan untuk menunda eksekusi coding aplikasi web. Artefak `implementation_plan.md` disimpan untuk dipakai nanti. Fokus beralih ke praktik bahasa Inggris secara langsung.
 
 ---
-*Terakhir diperbarui: 2026-06-17 00:02*
+*Terakhir diperbarui: 2026-06-17 00:10*
