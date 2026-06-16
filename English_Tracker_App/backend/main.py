@@ -405,11 +405,13 @@ def explain_concept(req: models.ExplainRequest):
         from fastapi.responses import StreamingResponse
         client = OpenAI(api_key=api_key)
         
+        target_type = "gambar/grafik" if req.image_base64 and not req.text.strip() else "kalimat/paragraf ATAU gambar"
+        
         prompt = f"""
 Anda adalah Senior Analyst yang sedang membimbing rekan kerja junior (non-Native Speaker).
-Tugas Anda adalah membaca kalimat/paragraf bahasa Inggris teknis berikut, lalu membedahnya agar mudah dipahami, baik secara konsep maupun kebahasaan.
+Tugas Anda adalah membedah dan menganalisis {target_type} teknis berikut agar mudah dipahami, baik secara konsep maupun kebahasaan. Jika berupa gambar, jelaskan setiap komponen atau alurnya secara mendetail.
 
-Teks yang membingungkan:
+Teks / Konteks Gambar:
 "{req.text}"
 
 WAJIB FORMAT JAWABAN ANDA DENGAN TEPAT 4 BAGIAN MENGGUNAKAN TAG BERIKUT (Tulis persis tag-nya):
@@ -428,12 +430,29 @@ Berikan penjelasan (explanation) komprehensif mengenai konsep tersebut, TETAPI d
 """
 
         def stream_generator():
+            messages = [
+                {"role": "system", "content": "You are a helpful educational assistant."}
+            ]
+            
+            if req.image_base64:
+                messages.append({
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": req.image_base64
+                            }
+                        }
+                    ]
+                })
+            else:
+                messages.append({"role": "user", "content": prompt})
+
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are a helpful educational assistant."},
-                    {"role": "user", "content": prompt}
-                ],
+                messages=messages,
                 max_tokens=800,
                 temperature=0.4,
                 stream=True

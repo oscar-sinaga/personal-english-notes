@@ -50,6 +50,7 @@
   let showToc = true;
   let showHeader = true;
   let doubtContent = "";
+  let doubtImageBase64 = null;
   let doubtStatus = "";
 
   const API_URL = "http://127.0.0.1:8000/api";
@@ -367,18 +368,39 @@
     }
   }
 
+  function handlePaste(e) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = () => {
+          doubtImageBase64 = reader.result;
+        };
+        reader.readAsDataURL(file);
+        break;
+      }
+    }
+  }
+
   async function explainDoubt() {
-    if (!doubtContent || !doubtContent.trim()) return;
+    if ((!doubtContent || !doubtContent.trim()) && !doubtImageBase64) return;
     isExplaining = true;
     explainResult = { core_concept: "", practical_example: "", analogy: "", english_explanation: "" };
     doubtStatus = "Casting Magic Explain...";
     let rawText = "";
 
+    let textToSend = doubtContent;
+    if (!textToSend || !textToSend.trim()) {
+      textToSend = "Tolong jelaskan makna, komponen, dan insight dari gambar/grafik ini secara detail.";
+    }
+
     try {
       const res = await fetch(`${API_URL}/explain`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: doubtContent })
+        body: JSON.stringify({ text: textToSend, image_base64: doubtImageBase64 })
       });
       
       const reader = res.body.getReader();
@@ -1056,8 +1078,14 @@
             <h3 class="text-xs font-bold text-amber-400 mb-2">❓ Confusing Concept / Grammar</h3>
             <p class="text-[10px] text-slate-400 mb-3 leading-relaxed">Paste complex English grammar or confusing risk concepts here to be reviewed by AI IDE later.</p>
             
-            <textarea bind:value={doubtContent} class="flex-1 w-full min-h-[150px] bg-slate-950 border border-slate-800 text-xs text-slate-300 px-2 py-2 rounded focus:border-amber-500 outline-none resize-none mb-3 custom-scrollbar" placeholder="Paste confusing sentence from the book here..."></textarea>
+            <textarea bind:value={doubtContent} on:paste={handlePaste} class="flex-1 w-full min-h-[150px] bg-slate-950 border border-slate-800 text-xs text-slate-300 px-2 py-2 rounded focus:border-amber-500 outline-none resize-none mb-3 custom-scrollbar" placeholder="Paste confusing sentence from the book here... (Or Ctrl+V to paste an image screenshot!)"></textarea>
             
+            {#if doubtImageBase64}
+              <div class="relative inline-block mb-3 bg-slate-900 border border-slate-700 p-1 rounded max-w-fit">
+                <img src={doubtImageBase64} alt="Pasted snapshot" class="max-h-[100px] object-contain rounded" />
+                <button class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold hover:bg-rose-400 border-2 border-slate-800" on:click={() => doubtImageBase64 = null}>×</button>
+              </div>
+            {/if}
             <div class="flex flex-col gap-2">
               <div class="flex gap-2">
                 <button class="text-[10px] flex-1 font-bold bg-sky-600 hover:bg-sky-500 text-slate-950 px-2 py-2 rounded cursor-pointer transition-colors uppercase tracking-wider flex items-center justify-center gap-1" on:click={() => translateDoubt('quick')} disabled={!doubtContent || !doubtContent.trim() || isTranslating}>
@@ -1079,7 +1107,7 @@
                 </button>
               </div>
 
-              <button class="text-[10px] font-bold bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider flex items-center justify-center gap-1 shadow-[0_0_10px_rgba(192,38,211,0.5)]" on:click={explainDoubt} disabled={!doubtContent || !doubtContent.trim() || isExplaining}>
+              <button class="text-[10px] font-bold bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider flex items-center justify-center gap-1 shadow-[0_0_10px_rgba(192,38,211,0.5)] disabled:opacity-50 disabled:cursor-not-allowed" on:click={explainDoubt} disabled={(!doubtContent || !doubtContent.trim()) && !doubtImageBase64 || isExplaining}>
                 {#if isExplaining}
                   <svg class="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                   Thinking...

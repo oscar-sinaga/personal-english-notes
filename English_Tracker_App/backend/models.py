@@ -21,8 +21,11 @@ class TranslateRequest(BaseModel):
 class GrammarRequest(BaseModel):
     text: str
 
+from typing import Optional
+
 class ExplainRequest(BaseModel):
     text: str
+    image_base64: Optional[str] = None
 
 class Vocabulary(Base):
     __tablename__ = "vocabulary"
