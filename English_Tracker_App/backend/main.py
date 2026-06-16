@@ -36,6 +36,10 @@ class LogExport(BaseModel):
     pillar: str  # e.g., "Active_Writing"
     content: str
 
+class VocabularyCreate(BaseModel):
+    term: str
+    definition: str
+
 @app.get("/api/progress")
 def get_progress(db: Session = Depends(get_db)):
     progress = db.query(models.ModuleProgress).all()
@@ -49,6 +53,20 @@ def update_progress(update: ProgressUpdate, db: Session = Depends(get_db)):
     else:
         record = models.ModuleProgress(module_name=update.module_name, is_completed=update.is_completed)
         db.add(record)
+    db.commit()
+    db.refresh(record)
+    return record
+
+@app.get("/api/vocabulary")
+def get_vocabulary(db: Session = Depends(get_db)):
+    vocab = db.query(models.Vocabulary).order_by(models.Vocabulary.id.desc()).all()
+    return vocab
+
+@app.post("/api/vocabulary")
+def add_vocabulary(vocab: VocabularyCreate, db: Session = Depends(get_db)):
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    record = models.Vocabulary(term=vocab.term, definition=vocab.definition, created_at=timestamp)
+    db.add(record)
     db.commit()
     db.refresh(record)
     return record

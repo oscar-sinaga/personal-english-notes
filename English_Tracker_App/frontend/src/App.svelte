@@ -17,12 +17,23 @@
   let logPillar = "Active_Writing";
   let exportStatus = "";
 
+  // Lexicon state
+  let vocabularies = [];
+  let newTerm = "";
+  let newDef = "";
+  let vocabStatus = "";
+
   const API_URL = "http://localhost:8000/api";
 
   onMount(async () => {
     if (syllabusData.length > 0) {
       expandedBlocks[syllabusData[0].id] = true;
     }
+    fetchProgress();
+    fetchVocab();
+  });
+
+  async function fetchProgress() {
     try {
       const res = await fetch(`${API_URL}/progress`);
       const data = await res.json();
@@ -31,7 +42,34 @@
         progressMap = progressMap; 
       }
     } catch (e) { console.error("Failed to fetch progress.", e); }
-  });
+  }
+
+  async function fetchVocab() {
+    try {
+      const res = await fetch(`${API_URL}/vocabulary`);
+      vocabularies = await res.json();
+    } catch (e) { console.error("Failed to fetch vocab.", e); }
+  }
+
+  async function addVocab() {
+    if (!newTerm.trim() || !newDef.trim()) return;
+    try {
+      const res = await fetch(`${API_URL}/vocabulary`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ term: newTerm, definition: newDef })
+      });
+      if (res.ok) {
+        newTerm = "";
+        newDef = "";
+        fetchVocab();
+        vocabStatus = "Saved!";
+        setTimeout(() => vocabStatus = "", 3000);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
 
   async function toggleNode(id) {
     const newState = !(progressMap[id] || false);
@@ -57,7 +95,7 @@
       else {
         clearInterval(interval);
         timerActive = false;
-        alert(`Waktu Habis untuk fase ${pillars[currentPillarIndex]}!`);
+        alert(`Time's up for ${pillars[currentPillarIndex]} phase!`);
       }
     }, 1000);
   }
@@ -81,7 +119,7 @@
   }
 
   async function submitLog() {
-    exportStatus = "Menyimpan...";
+    exportStatus = "Saving...";
     try {
       const sanitizedFolder = selectedTopic.replace(/[^a-zA-Z0-9_\- ]/g, "").replace(/\s+/g, "_");
       const res = await fetch(`${API_URL}/export-log`, {
@@ -90,161 +128,197 @@
         body: JSON.stringify({ topic_folder: sanitizedFolder, pillar: logPillar, content: logContent })
       });
       const data = await res.json();
-      exportStatus = `Tersimpan di: ${data.filepath}`;
+      exportStatus = `Saved in IDE: ${data.filepath.split('\\').pop()}`;
       logContent = "";
       setTimeout(() => { exportStatus = "" }, 5000);
     } catch (e) {
-      exportStatus = "Gagal menyimpan log.";
+      exportStatus = "Failed to save.";
     }
   }
+
+  // Calculate Progress
+  $: totalNodes = syllabusData.reduce((acc, block) => {
+    let blockCount = 0;
+    block.children.forEach(ch => {
+      blockCount += ch.children.length > 0 ? ch.children.length : 1;
+    });
+    return acc + blockCount;
+  }, 0);
+  
+  $: completedNodes = Object.values(progressMap).filter(Boolean).length;
+  $: progressPercent = totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0;
 </script>
 
-<main class="max-w-4xl mx-auto p-4 md:p-8 font-sans text-slate-100">
-  <header class="mb-10 text-center">
-    <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400 drop-shadow-sm mb-3">Credit Intelligence Tracker</h1>
-    <p class="text-slate-400 text-lg">Interactive Syllabus & Active English Habit Builder</p>
+<main class="min-h-screen bg-slate-950 font-sans text-slate-100 p-4 md:p-6 lg:h-screen lg:overflow-hidden flex flex-col">
+  
+  <!-- Top Navbar -->
+  <header class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl mb-6 flex-shrink-0">
+    <div class="flex items-center gap-4">
+      <div class="h-10 w-10 bg-teal-500/20 text-teal-400 rounded-lg flex items-center justify-center border border-teal-500/30">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+      </div>
+      <div>
+        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white">Credit Risk Learning Dashboard</h1>
+        <p class="text-xs text-slate-400 font-mono tracking-wider">PORTFOLIO TRACKER & LEXICON SYSTEM</p>
+      </div>
+    </div>
+    <div class="text-right">
+      <div class="text-xs text-slate-400 mb-1">OVERALL COMPLETION RISK</div>
+      <div class="flex items-center gap-3">
+        <div class="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+          <div class="h-full bg-teal-500 rounded-full transition-all duration-500" style="width: {progressPercent}%"></div>
+        </div>
+        <span class="font-mono font-bold {progressPercent > 50 ? 'text-teal-400' : 'text-amber-400'}">{progressPercent}%</span>
+      </div>
+    </div>
   </header>
 
-  <!-- Syllabus Tree Section -->
-  <section class="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-2xl mb-8">
-    <h2 class="text-2xl font-bold text-sky-400 mb-6 flex items-center gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-      Syllabus Progress (Level 3)
-    </h2>
-    <div class="flex flex-col gap-2 max-h-[500px] overflow-y-auto pr-4">
-      {#each syllabusData as block}
-        <div class="block-node">
-          <button class="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-slate-800/40 hover:bg-sky-900/20 border border-transparent hover:border-sky-500/30 transition-all text-left group cursor-pointer" on:click={() => toggleBlock(block.id)}>
-            <span class="text-slate-500 group-hover:text-sky-400 transition-transform duration-300 {expandedBlocks[block.id] ? 'rotate-90 text-sky-400' : ''}">▶</span>
-            <strong class="text-sky-300 text-lg">{block.name}</strong>
-          </button>
-          
-          {#if expandedBlocks[block.id]}
-            <div class="ml-4 mt-2 pl-4 border-l-2 border-sky-500/20 flex flex-col gap-2 pb-3 animate-in">
-              {#each block.children as chapter}
-                <div class="chapter-node">
-                  <button class="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 transition-colors text-left group cursor-pointer" on:click={() => toggleChapter(chapter.id)}>
-                    <span class="text-slate-500 text-sm transition-transform duration-300 {expandedChapters[chapter.id] ? 'rotate-90 text-sky-400' : ''}">▶</span>
-                    <span class="text-slate-200">{chapter.name}</span>
-                  </button>
+  <!-- 3-Column Dashboard Layout -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-hidden">
+    
+    <!-- Left Column: Syllabus Tree (Scrollable) -->
+    <section class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col h-full overflow-hidden">
+      <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Course Syllabus</h2>
+      
+      <div class="overflow-y-auto pr-2 custom-scrollbar flex-1">
+        {#each syllabusData as block}
+          <div class="mb-2">
+            <button class="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-all text-left group cursor-pointer" on:click={() => toggleBlock(block.id)}>
+              <span class="text-slate-500 text-xs transition-transform duration-300 {expandedBlocks[block.id] ? 'rotate-90 text-teal-400' : ''}">▶</span>
+              <strong class="text-slate-200 text-sm">{block.name}</strong>
+            </button>
+            
+            {#if expandedBlocks[block.id]}
+              <div class="ml-3 mt-1 pl-3 border-l-2 border-slate-800 flex flex-col gap-1 pb-2">
+                {#each block.children as chapter}
+                  <div class="mt-1">
+                    <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-800 transition-colors text-left group cursor-pointer" on:click={() => toggleChapter(chapter.id)}>
+                      <span class="text-slate-600 text-[10px] transition-transform duration-300 {expandedChapters[chapter.id] ? 'rotate-90 text-teal-400' : ''}">▶</span>
+                      <span class="text-slate-300 text-sm truncate" title={chapter.name}>{chapter.name}</span>
+                    </button>
 
-                  {#if expandedChapters[chapter.id]}
-                    <div class="ml-6 mt-1 pl-4 border-l border-dashed border-white/10 flex flex-col gap-1 py-2 animate-in">
-                      {#each chapter.children as sub}
-                        <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 cursor-pointer transition-colors group">
-                          <input type="checkbox" class="w-4 h-4 rounded border-slate-600 text-sky-500 focus:ring-sky-500 focus:ring-offset-slate-900 bg-slate-800 cursor-pointer" checked={progressMap[sub.id]} on:change={() => toggleNode(sub.id)} />
-                          <span class="text-sm text-slate-300 group-hover:text-white transition-colors {progressMap[sub.id] ? 'line-through opacity-50' : ''}">{sub.name}</span>
-                        </label>
-                      {/each}
-                      {#if chapter.children.length === 0}
-                        <label class="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-white/5 cursor-pointer transition-colors">
-                          <input type="checkbox" class="w-4 h-4 rounded border-slate-600 text-sky-500 focus:ring-sky-500 focus:ring-offset-slate-900 bg-slate-800 cursor-pointer" checked={progressMap[chapter.id]} on:change={() => toggleNode(chapter.id)} />
-                          <span class="text-sm text-slate-300 {progressMap[chapter.id] ? 'line-through opacity-50' : ''}">Mark chapter as completed</span>
-                        </label>
-                      {/if}
-                    </div>
-                  {/if}
-                </div>
+                    {#if expandedChapters[chapter.id]}
+                      <div class="ml-4 mt-1 pl-3 border-l border-dashed border-slate-700 flex flex-col gap-1">
+                        {#each chapter.children as sub}
+                          <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-800 cursor-pointer transition-colors group">
+                            <input type="checkbox" class="w-3.5 h-3.5 rounded border-slate-600 text-teal-500 bg-slate-900 cursor-pointer" checked={progressMap[sub.id]} on:change={() => toggleNode(sub.id)} />
+                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors {progressMap[sub.id] ? 'line-through opacity-50' : ''} truncate">{sub.name}</span>
+                          </label>
+                        {/each}
+                        {#if chapter.children.length === 0}
+                          <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-800 cursor-pointer transition-colors">
+                            <input type="checkbox" class="w-3.5 h-3.5 rounded border-slate-600 text-teal-500 bg-slate-900 cursor-pointer" checked={progressMap[chapter.id]} on:change={() => toggleNode(chapter.id)} />
+                            <span class="text-xs text-slate-400 {progressMap[chapter.id] ? 'line-through opacity-50' : ''}">Mark complete</span>
+                          </label>
+                        {/if}
+                      </div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    </section>
+
+    <!-- Center Column: Main Operations (Timer & Logger) -->
+    <section class="lg:col-span-6 flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar pr-2">
+      
+      <!-- Timer Panel -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl relative overflow-hidden">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-sky-500"></div>
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Phase Controller</h2>
+          <span class="px-3 py-1 bg-slate-800 rounded-full text-xs font-mono text-teal-400 border border-slate-700">{pillars[currentPillarIndex]}</span>
+        </div>
+        
+        <div class="text-center">
+          <div class="text-7xl font-black tracking-tight tabular-nums text-white mb-6 font-mono drop-shadow-[0_0_10px_rgba(20,184,166,0.3)]">
+            {formatTime(timeRemaining)}
+          </div>
+          <div class="flex justify-center gap-3">
+            {#if !timerActive}
+              <button class="px-6 py-2 rounded-lg font-bold bg-teal-500 hover:bg-teal-400 text-slate-950 transition-colors cursor-pointer" on:click={startTimer}>Start Run</button>
+            {:else}
+              <button class="px-6 py-2 rounded-lg font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer" on:click={pauseTimer}>Halt</button>
+            {/if}
+            <button class="px-6 py-2 rounded-lg font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors cursor-pointer disabled:opacity-50" on:click={resetTimer}>Reset</button>
+            <button class="px-6 py-2 rounded-lg font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50" on:click={nextPillar} disabled={currentPillarIndex === 2}>Next Stage</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Logger Panel -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl flex-1 flex flex-col">
+        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Documentation Input</h2>
+        
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="flex flex-col gap-1.5">
+            <label for="topic" class="text-xs text-slate-500">Mapping Topic:</label>
+            <select id="topic" bind:value={selectedTopic} class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 cursor-pointer outline-none">
+              {#each syllabusData as block}
+                <option value={block.id}>{block.name}</option>
               {/each}
-            </div>
+            </select>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <label for="pillar" class="text-xs text-slate-500">Activity Type:</label>
+            <select id="pillar" bind:value={logPillar} class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 cursor-pointer outline-none">
+              <option value="Active_Writing">Active Writing</option>
+              <option value="Circumlocution">Circumlocution</option>
+              <option value="Role_Play">Role-Play Summary</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="flex-1 flex flex-col min-h-[250px]">
+          <textarea id="content" bind:value={logContent} class="flex-1 w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg p-4 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none resize-none" placeholder="Draft your technical summary here... (Markdown supported)"></textarea>
+        </div>
+        
+        <div class="mt-4 flex items-center justify-between">
+          <button class="px-6 py-2 rounded-lg font-bold bg-white text-slate-900 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer" on:click={submitLog} disabled={!logContent.trim()}>
+            Save to IDE
+          </button>
+          {#if exportStatus}
+            <span class="text-teal-400 text-sm flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+              {exportStatus}
+            </span>
           {/if}
         </div>
-      {/each}
-    </div>
-  </section>
+      </div>
+    </section>
 
-  <!-- Timer Section -->
-  <section class="bg-gradient-to-br from-slate-800/80 to-slate-900/90 backdrop-blur-md border border-white/10 rounded-2xl p-8 shadow-2xl mb-8 text-center relative overflow-hidden">
-    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1 bg-gradient-to-r from-transparent via-sky-500 to-transparent opacity-50"></div>
-    
-    <h2 class="text-2xl font-bold text-sky-400 mb-2 flex items-center justify-center gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-      Habit Timer: {pillars[currentPillarIndex]}
-    </h2>
-    
-    <div class="text-7xl md:text-8xl font-black my-6 tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-br from-sky-300 to-indigo-500 drop-shadow-[0_0_15px_rgba(56,189,248,0.4)]">
-      {formatTime(timeRemaining)}
-    </div>
-    
-    <div class="flex flex-wrap justify-center gap-4 mt-8">
-      {#if !timerActive}
-        <button class="px-6 py-3 rounded-xl font-semibold bg-sky-500/20 text-sky-300 border border-sky-500/30 hover:bg-sky-500/30 hover:shadow-[0_0_15px_rgba(56,189,248,0.3)] transition-all flex items-center gap-2 cursor-pointer" on:click={startTimer}>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
-          Start
-        </button>
-      {:else}
-        <button class="px-6 py-3 rounded-xl font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all flex items-center gap-2 cursor-pointer" on:click={pauseTimer}>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-          Pause
-        </button>
-      {/if}
-      <button class="px-6 py-3 rounded-xl font-semibold bg-slate-600/20 text-slate-300 border border-slate-600/40 hover:bg-slate-600/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer" on:click={resetTimer} disabled={currentPillarIndex === 0 && timeRemaining === 20*60}>
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg>
-        Reset
-      </button>
-      <button class="px-6 py-3 rounded-xl font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 hover:bg-indigo-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer" on:click={nextPillar} disabled={currentPillarIndex === 2}>
-        Next Phase
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-      </button>
-    </div>
-  </section>
+    <!-- Right Column: Lexicon Bank -->
+    <section class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col h-full overflow-hidden">
+      <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2 flex justify-between items-center">
+        Technical Lexicon
+        <span class="bg-slate-800 text-slate-300 text-xs px-2 py-0.5 rounded-full">{vocabularies.length} terms</span>
+      </h2>
+      
+      <!-- Add New Term -->
+      <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 mb-4">
+        <input type="text" bind:value={newTerm} placeholder="Risk Term (e.g. LGD)" class="w-full bg-transparent border-b border-slate-800 text-sm text-slate-200 px-1 py-2 mb-2 focus:border-teal-500 outline-none">
+        <textarea bind:value={newDef} rows="2" placeholder="English definition/circumlocution..." class="w-full bg-transparent text-sm text-slate-300 px-1 py-1 focus:outline-none resize-none mb-2"></textarea>
+        <div class="flex justify-between items-center">
+          <button class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded cursor-pointer transition-colors" on:click={addVocab}>+ Add Term</button>
+          {#if vocabStatus} <span class="text-teal-400 text-xs">{vocabStatus}</span> {/if}
+        </div>
+      </div>
 
-  <!-- Logger Section -->
-  <section class="bg-slate-900/40 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-2xl">
-    <h2 class="text-2xl font-bold text-sky-400 mb-6 flex items-center gap-2">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-      Active English Logger
-    </h2>
-    
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-      <div class="flex flex-col gap-2">
-        <label for="topic" class="text-sm font-medium text-slate-300">Topic Folder:</label>
-        <div class="relative">
-          <select id="topic" bind:value={selectedTopic} class="w-full appearance-none bg-slate-800/80 border border-slate-600 text-slate-200 rounded-lg py-3 px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-shadow cursor-pointer">
-            {#each syllabusData as block}
-              <option value={block.id}>{block.name}</option>
-            {/each}
-          </select>
-          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+      <!-- Lexicon List (Scrollable) -->
+      <div class="overflow-y-auto pr-2 custom-scrollbar flex-1 flex flex-col gap-3">
+        {#if vocabularies.length === 0}
+          <div class="text-center text-slate-600 text-sm mt-4 italic">No terms added yet.</div>
+        {/if}
+        {#each vocabularies as v}
+          <div class="bg-slate-800/40 border border-slate-800 rounded-lg p-3 group hover:border-slate-700 transition-colors">
+            <h3 class="font-bold text-teal-400 text-sm mb-1 group-hover:text-teal-300">{v.term}</h3>
+            <p class="text-slate-400 text-xs leading-relaxed">{v.definition}</p>
           </div>
-        </div>
+        {/each}
       </div>
-      
-      <div class="flex flex-col gap-2">
-        <label for="pillar" class="text-sm font-medium text-slate-300">Pillar Phase:</label>
-        <div class="relative">
-          <select id="pillar" bind:value={logPillar} class="w-full appearance-none bg-slate-800/80 border border-slate-600 text-slate-200 rounded-lg py-3 px-4 pr-10 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-shadow cursor-pointer">
-            <option value="Active_Writing">1. Active Writing</option>
-            <option value="Circumlocution">2. Thinking & Circumlocution</option>
-            <option value="Role_Play">3. Role-Play (Transcript)</option>
-          </select>
-          <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
-            <svg class="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <div class="flex flex-col gap-2">
-      <div class="flex justify-between items-end">
-        <label for="content" class="text-sm font-medium text-slate-300">Log Content (Markdown supported):</label>
-      </div>
-      <textarea id="content" bind:value={logContent} rows="8" class="w-full bg-slate-800/60 border border-slate-600 text-slate-200 rounded-xl p-4 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-shadow resize-y" placeholder="Type your 20-minute output here..."></textarea>
-    </div>
-    
-    <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <button class="w-full sm:w-auto px-8 py-3 rounded-xl font-bold bg-gradient-to-r from-sky-500 to-indigo-500 text-white shadow-lg shadow-sky-500/20 hover:shadow-sky-500/40 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex justify-center items-center gap-2 cursor-pointer" on:click={submitLog} disabled={!logContent.trim()}>
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
-        Export & Save .md
-      </button>
-      
-      {#if exportStatus}
-        <div class="px-4 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-sm animate-in flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-          {exportStatus}
-        </div>
-      {/if}
-    </div>
-  </section>
+    </section>
+  </div>
 </main>
