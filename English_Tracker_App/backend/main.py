@@ -517,6 +517,11 @@ def explain_concept(req: models.ExplainRequest):
 Anda adalah Senior Analyst yang sedang membimbing rekan kerja junior (non-Native Speaker).
 Tugas Anda adalah membedah dan menganalisis {target_type} teknis berikut agar mudah dipahami, baik secara konsep maupun kebahasaan. Jika berupa gambar, jelaskan setiap komponen atau alurnya secara mendetail.
 
+CRITICAL REQUIREMENT: UNTUK SEMUA RUMUS MATEMATIKA, VARIABEL, ATAU PERSAMAAN, ANDA WAJIB MENGGUNAKAN FORMAT LaTeX.
+- Gunakan \[ ... \] untuk blok rumus (persamaan yang berdiri sendiri).
+- Gunakan \( ... \) untuk variabel atau rumus sebaris (inline math).
+- JANGAN gunakan teks biasa atau sekadar **bold** untuk entitas matematika.
+
 Teks / Konteks Gambar:
 "{req.text}"
 
@@ -596,12 +601,17 @@ Bedah frasa-frasa atau struktur kalimat spesifik dari teks bahasa Inggrisnya (ji
 
 rag_index_cache = None
 
+bm25_index_cache = None
+
 def get_rag_context(query: str, top_k: int = 10) -> str:
     global rag_index_cache
+    global bm25_index_cache
+    
     import os
     import json
     import numpy as np
     from openai import OpenAI
+    from rank_bm25 import BM25Okapi
     
     if rag_index_cache is None:
         index_path = r"D:\ai_agent echancement\Belajar bahasa inggris\English_Tracker_App\backend\rag_index.json"
@@ -614,46 +624,85 @@ def get_rag_context(query: str, top_k: int = 10) -> str:
     if not rag_index_cache:
         return ""
         
+    # Initialize BM25 on the fly if not exists
+    if bm25_index_cache is None and rag_index_cache:
+        # Tokenize corpus for BM25
+        tokenized_corpus = [chunk["text"].lower().split() for chunk in rag_index_cache]
+        bm25_index_cache = BM25Okapi(tokenized_corpus)
+        
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     
-    # 1. Query Expansion
+    # 1. Multi-Query Expansion
+    queries = [query]
     try:
         expansion_response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a credit scoring AI assistant. The user will give you a short query. Expand it into a clear, full English question asking for the definition, meaning, or impact of that term in the context of Credit Scoring and banking."},
+                {"role": "system", "content": "You are an AI assistant. The user provides a query about Credit Scoring. Generate 3 different versions of this query to maximize search retrieval: 1) A formal academic version, 2) A version focusing on definition/meaning, 3) A version focusing on impact/examples. Output ONLY the 3 queries, separated by newlines."},
                 {"role": "user", "content": query}
             ],
-            max_tokens=50
+            max_tokens=100
         )
-        expanded_query = expansion_response.choices[0].message.content.strip()
-        print(f"RAG: Expanded query -> {expanded_query}")
+        expanded_text = expansion_response.choices[0].message.content.strip()
+        queries = [q.strip() for q in expanded_text.split('\n') if q.strip()]
+        if not queries:
+            queries = [query]
+        print(f"RAG: Multi-Queries generated -> {queries}")
     except Exception as e:
         print(f"RAG Expansion Error: {e}")
-        expanded_query = query
+        queries = [query]
         
-    response = client.embeddings.create(
-        input=expanded_query,
-        model="text-embedding-3-small"
-    )
-    query_vector = np.array(response.data[0].embedding)
+    # Embed all queries at once
+    try:
+        response = client.embeddings.create(
+            input=queries,
+            model="text-embedding-3-small"
+        )
+        query_vectors = [np.array(data.embedding) for data in response.data]
+    except Exception as e:
+        print(f"RAG Embedding Error: {e}")
+        return ""
     
-    similarities = []
-    for chunk in rag_index_cache:
-        chunk_vec = np.array(chunk["vector"])
-        norm_q = np.linalg.norm(query_vector)
-        norm_c = np.linalg.norm(chunk_vec)
-        if norm_q == 0 or norm_c == 0:
-            sim = 0
-        else:
-            sim = np.dot(query_vector, chunk_vec) / (norm_q * norm_c)
-        similarities.append((sim, chunk))
+    # Store RRF scores for each chunk index: dict mapping chunk_idx -> score
+    chunk_scores = {i: 0.0 for i in range(len(rag_index_cache))}
+    
+    for q_idx, q_str in enumerate(queries):
+        q_vec = query_vectors[q_idx]
         
-    similarities.sort(key=lambda x: x[0], reverse=True)
-    top_chunks = similarities[:top_k]
+        # --- Vector Search ---
+        vec_similarities = []
+        for i, chunk in enumerate(rag_index_cache):
+            chunk_vec = np.array(chunk["vector"])
+            norm_q = np.linalg.norm(q_vec)
+            norm_c = np.linalg.norm(chunk_vec)
+            if norm_q == 0 or norm_c == 0:
+                sim = 0
+            else:
+                sim = np.dot(q_vec, chunk_vec) / (norm_q * norm_c)
+            vec_similarities.append((sim, i))
+        
+        vec_similarities.sort(key=lambda x: x[0], reverse=True)
+        # Add RRF for vector
+        for rank, (sim, chunk_idx) in enumerate(vec_similarities):
+            chunk_scores[chunk_idx] += 1.0 / (60 + rank + 1)
+            
+        # --- BM25 Search ---
+        tokenized_query = q_str.lower().split()
+        bm25_scores = bm25_index_cache.get_scores(tokenized_query)
+        
+        bm25_similarities = [(score, i) for i, score in enumerate(bm25_scores)]
+        bm25_similarities.sort(key=lambda x: x[0], reverse=True)
+        
+        # Add RRF for BM25
+        for rank, (score, chunk_idx) in enumerate(bm25_similarities):
+            chunk_scores[chunk_idx] += 1.0 / (60 + rank + 1)
+
+    # Final ranking
+    ranked_chunks = sorted(chunk_scores.items(), key=lambda x: x[1], reverse=True)
+    top_chunk_indices = [idx for idx, score in ranked_chunks[:top_k]]
     
     # 2. LLM Compressive RAG / Fact Extraction
-    chunks_text = "\n\n".join([f"--- Chunk {i} ---\n{c['text']}" for i, (s, c) in enumerate(top_chunks)])
+    chunks_text = "\n\n".join([f"--- Page {rag_index_cache[idx]['page']} ---\n{rag_index_cache[idx]['text']}" for i, idx in enumerate(top_chunk_indices)])
     
     try:
         extraction_prompt = f"""Given the user question: "{query}"
@@ -661,31 +710,26 @@ def get_rag_context(query: str, top_k: int = 10) -> str:
 Here are {top_k} excerpts from a Credit Scoring textbook:
 {chunks_text}
 
-Task: Extract ONLY the factual points from these excerpts that directly answer or relate to the user's question. 
-Write a highly condensed summary of these facts using bullet points. Do not include any fluff or introductory text. 
+Task: Extract ALL factual points from these excerpts that directly answer or relate to the user's question. 
+Be EXHAUSTIVE. Do NOT summarize or omit any details, examples, or exceptions. List every single relevant fact using bullet points. 
+For each fact, you MUST explicitly cite the [Page X] it came from at the end of the bullet point.
+Do not include any fluff or introductory text. 
 If none of the excerpts contain relevant information, output exactly "NONE"."""
 
         extraction_response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": extraction_prompt}],
-            max_tokens=300
+            max_tokens=600
         )
+        compressed_facts = extraction_response.choices[0].message.content.strip()
+        print(f"RAG Compressed Facts:\n{compressed_facts}")
         
-        compressed_context = extraction_response.choices[0].message.content.strip()
-        print(f"RAG: Compressed context length -> {len(compressed_context)} chars")
-        
-        if compressed_context.strip() == "NONE":
+        if compressed_facts == "NONE":
             return ""
-            
-        context = "Here are some extracted facts from the PDF book:\n\n" + compressed_context + "\n\n"
-        return context
+        return compressed_facts
     except Exception as e:
-        print(f"RAG Compression Error: {e}")
-        # Fallback to pure text concatenation of top 2
-        context = "Here are some relevant excerpts from the PDF book:\n\n"
-        for s, chunk in top_chunks[:2]:
-            context += f"--- Page {chunk['page']} ---\n{chunk['text']}\n\n"
-        return context
+        print(f"RAG Extraction Error: {e}")
+        return chunks_text[:2000]
 
 @app.post("/api/chat")
 async def chat_with_bot(req: models.ChatRequest):
@@ -730,7 +774,7 @@ async def chat_with_bot(req: models.ChatRequest):
                 print(f"RAG Error: {e}")
                 
         # Insert a system message to guide the chatbot behavior
-        system_msg_content = "You are a friendly, encouraging, and highly knowledgeable English learning assistant. You help the user understand complex English texts, grammar, vocabulary, and concepts. Respond in Indonesian but use English terms when appropriate. Explain things simply."
+        system_msg_content = "You are a friendly, encouraging, and highly knowledgeable English learning assistant. You help the user understand complex English texts, grammar, vocabulary, and concepts. Respond in Indonesian but use English terms when appropriate. Explain things simply.\n\nCRITICAL REQUIREMENT: For ANY mathematical formulas, equations, or variables, you MUST use LaTeX formatting. Enclose block equations in \\[ ... \\]. Enclose inline math variables in \\( ... \\). Do NOT use plain text formatting or markdown bolding for math."
         
         if context:
             system_msg_content += f"\n\nUse the following excerpts from the user's PDF to inform your answer. Always cite the page number if you use the information.\n\n{context}"

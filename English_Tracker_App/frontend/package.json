@@ -15,6 +15,11 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
+    "dompurify": "^3.4.11",
+    "jsdom": "^29.1.1",
+    "katex": "^0.17.0",
+    "marked": "^18.0.5",
+    "marked-katex-extension": "^5.1.10",
     "tailwindcss": "^4.3.1"
   }
 }

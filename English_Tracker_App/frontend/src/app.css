@@ -35,3 +35,27 @@ body {
 .animate-in {
   animation: slideInFromTop 0.3s ease-out forwards;
 }
+
+/* Markdown styles */
+.markdown-body strong { font-weight: 700; color: #fff; }
+.markdown-body p { margin-bottom: 0.5rem; }
+.markdown-body ul { list-style-type: disc; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+.markdown-body ol { list-style-type: decimal; padding-left: 1.5rem; margin-bottom: 0.5rem; }
+.markdown-body a { color: #38bdf8; text-decoration: underline; }
+.markdown-body code { background: rgba(255,255,255,0.1); padding: 0.1rem 0.3rem; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+
+/* KaTeX Responsive & Sizing Styles */
+.markdown-body {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 0;
+  margin: 0.5rem 0;
+}
+.katex {
+  font-size: 1.25em !important;
+}
+

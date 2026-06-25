@@ -1,6 +1,30 @@
 <script>
   import { onMount } from 'svelte';
   import syllabusData from './syllabus.json';
+  import { marked } from 'marked';
+  import DOMPurify from 'dompurify';
+  import markedKatex from 'marked-katex-extension';
+
+  marked.use(markedKatex({ 
+    throwOnError: false,
+    output: 'html',
+    nonStandard: true
+  }));
+
+  function renderMarkdown(text) {
+    if (!text) return "";
+    let processedText = text
+      .replace(/\\\[/g, '\n$$$$\n')
+      .replace(/\\\]/g, '\n$$$$\n')
+      .replace(/\\\(/g, '$$')
+      .replace(/\\\)/g, '$$')
+      .replace(/\$\$(.*?)\$\$/gs, '\n$$$$\n$1\n$$$$\n');
+      
+    return DOMPurify.sanitize(marked.parse(processedText), {
+      ADD_TAGS: ['math', 'semantics', 'mrow', 'mi', 'mo', 'mn', 'msup', 'mfrac', 'annotation'],
+      ADD_ATTR: ['mathvariant', 'encoding', 'display', 'xmlns', 'aria-hidden', 'class', 'style']
+    });
+  }
 
   let progressMap = {};
   let expandedBlocks = {};
@@ -66,6 +90,7 @@
 
   // Chatbot State
   let isChatOpen = false;
+  let isChatMaximized = false;
   let chatMessages = [];
   let chatInput = "";
   let isChatLoading = false;
@@ -700,7 +725,11 @@
   $: progressPercent = totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0;
 </script>
 
-<main class="h-screen min-h-[800px] bg-slate-950 font-sans text-slate-100 p-4 md:p-6 flex flex-col select-none" style="{isResizing || isResizingCompanion ? 'cursor: col-resize;' : ''}">
+<svelte:head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+</svelte:head>
+
+<main class="h-screen min-h-[800px] bg-slate-950 font-sans text-slate-100 p-4 md:p-6 flex flex-col" style="{isResizing || isResizingCompanion ? 'cursor: col-resize;' : ''}">
   
   <!-- Interactions Modal -->
   {#if showInteractionsModal}
@@ -756,12 +785,8 @@
                   <div class="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
                     <span class="w-1.5 h-1.5 rounded-full bg-teal-500"></span> AI Response
                   </div>
-                  <div class="text-sm text-slate-200 whitespace-pre-wrap bg-slate-950/30 p-3 rounded-md">
-                    {#if item.interaction_type === 'Grammar'}
-                      {@html item.response_text.replace(/\\n/g, '<br>')}
-                    {:else}
-                      {item.response_text}
-                    {/if}
+                  <div class="text-sm text-slate-200 markdown-body bg-slate-950/30 p-3 rounded-md">
+                    {@html renderMarkdown(item.response_text)}
                   </div>
                 </div>
               </div>
@@ -1265,15 +1290,18 @@
         <button class="bg-slate-900/80 backdrop-blur border border-slate-700 p-2 rounded-lg shadow-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800 transition-colors pointer-events-auto" on:click={() => showToc = !showToc} title="Toggle Table of Contents">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
         </button>
+        <button class="bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-lg shadow-lg text-xs font-bold transition-colors pointer-events-auto flex items-center gap-2 {showCompanion ? 'bg-amber-500 text-slate-950 border-amber-500 hover:bg-amber-400' : 'text-amber-400 hover:bg-amber-500/20'}" on:click={() => showCompanion = !showCompanion}>
+          {showCompanion ? 'Close Companion' : '📖 Reading Companion'}
+        </button>
+        <div class="bg-slate-900/80 backdrop-blur border border-slate-700 px-2 py-1.5 rounded-lg shadow-lg pointer-events-auto hidden md:flex items-center gap-1">
+          <button class="text-slate-400 hover:text-teal-400 px-1 cursor-pointer font-bold" on:click={() => pdfPage > 1 ? pdfPage-- : null} title="Previous Jump">&lt;</button>
+          <span class="text-[10px] font-bold tracking-wider text-slate-500 uppercase">Jump To</span>
+          <input type="number" bind:value={pdfPage} class="w-10 bg-slate-950/50 border border-slate-700 rounded text-center text-xs text-teal-400 font-mono focus:outline-none focus:border-teal-500 py-0.5 transition-colors" min="1" title="Enter Page Number">
+          <button class="text-slate-400 hover:text-teal-400 px-1 cursor-pointer font-bold" on:click={() => pdfPage++} title="Next Jump">&gt;</button>
+        </div>
       </div>
 
       <div class="absolute top-3 right-3 z-10 flex gap-2">
-        <button class="bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-lg shadow-lg text-xs font-bold transition-colors pointer-events-auto flex items-center gap-2 {showCompanion ? 'bg-amber-500 text-slate-950 border-amber-500 hover:bg-amber-400' : 'text-amber-400 hover:bg-amber-500/20'}" on:click={() => showCompanion = !showCompanion}>
-          {showCompanion ? 'Close Companion' : '💡 Reading Companion'}
-        </button>
-        <div class="bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-lg shadow-lg pointer-events-none hidden md:block">
-          <span class="text-xs font-mono text-teal-400">PAGE {pdfPage}</span>
-        </div>
       </div>
       
       {#key pdfPage}
@@ -1384,23 +1412,23 @@
               <div class="mt-4 p-4 bg-fuchsia-950/20 border border-fuchsia-800 rounded-lg shadow-[0_0_15px_rgba(192,38,211,0.1)] flex flex-col gap-3">
                 <div>
                   <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1 mb-1">🎯 Core Concept (ID)</span>
-                  <p class="text-[11px] text-slate-200 leading-relaxed">{explainResult.core_concept}</p>
+                  <div class="text-[11px] text-slate-200 leading-relaxed markdown-body">{@html renderMarkdown(explainResult.core_concept)}</div>
                 </div>
                 <div>
-                  <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1 mb-1">💼 Practical Example (ID)</span>
-                  <p class="text-[11px] text-slate-300 leading-relaxed bg-amber-950/30 p-2 rounded border-l-2 border-amber-500">{explainResult.practical_example}</p>
+                  <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1 mb-1">💡 Practical Example (ID)</span>
+                  <div class="text-[11px] text-slate-300 leading-relaxed bg-amber-950/30 p-2 rounded border-l-2 border-amber-500 markdown-body">{@html renderMarkdown(explainResult.practical_example)}</div>
                 </div>
                 <div>
-                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1 mb-1">💡 Smart Analogy</span>
-                  <p class="text-[11px] text-slate-300 leading-relaxed bg-emerald-950/30 p-2 rounded border-l-2 border-emerald-500">{explainResult.analogy}</p>
+                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1 mb-1">🧠 Smart Analogy</span>
+                  <div class="text-[11px] text-slate-300 leading-relaxed bg-emerald-950/30 p-2 rounded border-l-2 border-emerald-500 markdown-body">{@html renderMarkdown(explainResult.analogy)}</div>
                 </div>
                 <div>
-                  <span class="text-[10px] font-bold text-fuchsia-400 uppercase tracking-wider flex items-center gap-1 mb-1">🇬🇧 English Explanation</span>
-                  <p class="text-[11px] text-slate-300 leading-relaxed italic bg-fuchsia-900/30 p-2 rounded border-l-2 border-fuchsia-500">{explainResult.english_explanation}</p>
+                  <span class="text-[10px] font-bold text-fuchsia-400 uppercase tracking-wider flex items-center gap-1 mb-1">💬 English Explanation</span>
+                  <div class="text-[11px] text-slate-300 leading-relaxed italic bg-fuchsia-900/30 p-2 rounded border-l-2 border-fuchsia-500 markdown-body">{@html renderMarkdown(explainResult.english_explanation)}</div>
                 </div>
                 <div>
                   <span class="text-[10px] font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1 mb-1">🔍 Phrasing Breakdown</span>
-                  <p class="text-[11px] text-slate-300 leading-relaxed bg-teal-900/30 p-2 rounded border-l-2 border-teal-500">{explainResult.phrasing_breakdown}</p>
+                  <div class="text-[11px] text-slate-300 leading-relaxed bg-teal-900/30 p-2 rounded border-l-2 border-teal-500 markdown-body">{@html renderMarkdown(explainResult.phrasing_breakdown)}</div>
                 </div>
               </div>
             {/if}
@@ -1472,6 +1500,7 @@
   <!-- ============================================== -->
   <!-- FLOATING CHATBOT WIDGET                        -->
   <!-- ============================================== -->
+
   <button 
     class="fixed bottom-6 right-6 z-[100] bg-gradient-to-r from-teal-500 to-sky-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:shadow-[0_0_25px_rgba(20,184,166,0.6)] hover:scale-105 transition-all cursor-pointer border-2 border-slate-900 group flex items-center gap-2"
     on:click={() => { isChatOpen = !isChatOpen; if(isChatOpen) scrollToBottom(); }}
@@ -1483,16 +1512,25 @@
   </button>
 
   {#if isChatOpen}
-    <div class="fixed bottom-24 right-6 z-[100] w-80 md:w-96 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style="height: 500px; max-height: calc(100vh - 120px);">
+    <div class="fixed {isChatMaximized ? 'inset-4 md:inset-10 z-[200] w-auto h-auto' : 'bottom-24 right-6 z-[100] w-80 md:w-96'} bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300" style="{isChatMaximized ? '' : 'height: 500px; max-height: calc(100vh - 120px);'}">
       <!-- Header -->
       <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-4 border-b border-slate-700 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2">
           <div class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
           <span class="font-bold text-slate-200 text-sm">English AI Assistant</span>
         </div>
-        <button class="text-slate-400 hover:text-white transition-colors cursor-pointer" on:click={() => isChatOpen = false}>
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-        </button>
+        <div class="flex items-center gap-3">
+          <button class="text-slate-400 hover:text-white transition-colors cursor-pointer" on:click={() => isChatMaximized = !isChatMaximized} title={isChatMaximized ? "Minimize" : "Maximize"}>
+            {#if isChatMaximized}
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 14h6v6m10-10h-6V4m0 10l6 6M4 4l6 6" /></svg>
+            {:else}
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+            {/if}
+          </button>
+          <button class="text-slate-400 hover:text-white transition-colors cursor-pointer" on:click={() => isChatOpen = false}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+          </button>
+        </div>
       </div>
       
       <!-- Messages -->
@@ -1507,8 +1545,12 @@
         {#each chatMessages as msg}
           <div class="flex flex-col {msg.role === 'user' ? 'items-end' : 'items-start'}">
             <span class="text-[9px] text-slate-500 font-bold uppercase mb-1 px-1">{msg.role === 'user' ? 'You' : 'AI Assistant'}</span>
-            <div class="p-3 rounded-2xl max-w-[85%] text-[13px] leading-relaxed shadow-sm whitespace-pre-wrap {msg.role === 'user' ? 'bg-teal-600 text-white rounded-tr-sm' : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-sm'}">
-              {msg.content}
+            <div class="p-3 rounded-2xl max-w-[85%] text-[13px] leading-relaxed shadow-sm {msg.role === 'user' ? 'whitespace-pre-wrap bg-teal-600 text-white rounded-tr-sm' : 'markdown-body bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-sm'}">
+              {#if msg.role === 'assistant'}
+                {@html renderMarkdown(msg.content)}
+              {:else}
+                {msg.content}
+              {/if}
             </div>
           </div>
         {/each}
