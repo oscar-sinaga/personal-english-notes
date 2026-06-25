@@ -10,6 +10,7 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
+| 2026-06-25 21:44 | Add AI RAG Chatbot with PDF Indexing and Saved Learnings History | `668c985` | ✅ Done |
 | 2026-06-17 00:28 | Implement Magic Vision for image explanation in ELI5 mode | `2fbf801` | ✅ Done |
 | 2026-06-17 00:10 | Implement streaming for Magic Explain using plain text chunks | `470134a` | ✅ Done |
 | 2026-06-17 00:02 | Refine Magic Explain to use 4-part split: core concept, practical example, smart analogy, and english explanation | `b9818a3` | ✅ Done |
@@ -81,4 +82,4 @@
 5. **Menunda Pembuatan Personal English Tracker App**. (2026-06-07): User memutuskan untuk menunda eksekusi coding aplikasi web. Artefak `implementation_plan.md` disimpan untuk dipakai nanti. Fokus beralih ke praktik bahasa Inggris secara langsung.
 
 ---
-*Terakhir diperbarui: 2026-06-17 00:28*
+*Terakhir diperbarui: 2026-06-25 21:46*
