@@ -1181,133 +1181,34 @@
   {:else}
   
   <div class="flex flex-1 overflow-hidden relative z-10 w-full h-full">
-    
-    <!-- TOC Sidebar (Resizable) -->
-    {#if showToc}
-    <section class="bg-slate-900 border border-slate-800 rounded-xl p-0 shadow-xl flex flex-col h-full overflow-hidden shrink-0" style="width: {tocWidth}px;">
-      <div class="p-4 border-b border-slate-800 bg-slate-950 shrink-0">
-        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Book Navigation</h2>
-        <p class="text-[10px] text-slate-500 mt-1">Jump to any specific chapter up to Level 5.</p>
-      </div>
+    <!-- Reading Mode Layout -->
+    {#if appMode === 'reading'}
+    <div class="flex-1 min-h-0 flex gap-4 pb-4 w-full" style="{isResizing || isResizingCompanion ? 'pointer-events: none;' : ''}">
       
-      <div class="flex-1 overflow-y-auto custom-scrollbar p-2">
-        {#if tocTree.length === 0}
-           <p class="text-slate-500 text-xs p-4 text-center">Loading TOC...</p>
-        {:else}
-          {#each tocTree as l1}
-            <div class="mb-1">
-              <button 
-                class="w-full text-left py-1.5 px-2 hover:bg-slate-800 rounded transition-colors block text-[13px] font-bold text-teal-400 mt-2 flex justify-between items-center group cursor-pointer"
-                on:click={() => { changePdfPage(l1.page); l1.expanded = !l1.expanded; tocTree = tocTree; }}
-                title={l1.title}>
-                <span class="truncate pr-2">{l1.title}</span>
-                {#if l1.children.length > 0}
-                  <span class="text-slate-500 text-[10px] transition-transform {l1.expanded ? 'rotate-90 text-teal-400' : ''}">▶</span>
-                {/if}
-              </button>
-              
-              {#if l1.expanded && l1.children.length > 0}
-                <div class="ml-2 border-l border-slate-800 pl-1">
-                  {#each l1.children as l2}
-                    <div class="mt-0.5">
-                      <button 
-                        class="w-full text-left py-1 px-2 hover:bg-slate-800 rounded transition-colors block text-[12px] text-slate-300 flex justify-between items-center group cursor-pointer"
-                        on:click={() => { changePdfPage(l2.page); l2.expanded = !l2.expanded; tocTree = tocTree; }}
-                        title={l2.title}>
-                        <span class="truncate pr-2">{l2.title}</span>
-                        {#if l2.children.length > 0}
-                          <span class="text-slate-600 text-[9px] transition-transform {l2.expanded ? 'rotate-90 text-teal-400' : ''}">▶</span>
-                        {/if}
-                      </button>
-                      
-                      {#if l2.expanded && l2.children.length > 0}
-                        <div class="ml-2 border-l border-dashed border-slate-700 pl-1">
-                          {#each l2.children as l3}
-                            <div class="mt-0.5">
-                              <button 
-                                class="w-full text-left py-1 px-2 hover:bg-slate-800 rounded transition-colors block text-[11px] text-slate-400 flex justify-between items-center cursor-pointer"
-                                on:click={() => { changePdfPage(l3.page); l3.expanded = !l3.expanded; tocTree = tocTree; }}
-                                title={l3.title}>
-                                <span class="truncate pr-2">{l3.title}</span>
-                                {#if l3.children.length > 0}
-                                  <span class="text-slate-600 text-[9px] transition-transform {l3.expanded ? 'rotate-90 text-teal-400' : ''}">▶</span>
-                                {/if}
-                              </button>
-
-                              {#if l3.expanded && l3.children.length > 0}
-                                <div class="ml-2 border-l border-dashed border-slate-700/50 pl-1">
-                                  {#each l3.children as l4}
-                                    <div class="mt-0.5">
-                                      <button 
-                                        class="w-full text-left py-1 px-2 hover:bg-slate-800 rounded transition-colors block text-[10px] text-slate-500 flex justify-between items-center cursor-pointer"
-                                        on:click={() => { changePdfPage(l4.page); l4.expanded = !l4.expanded; tocTree = tocTree; }}
-                                        title={l4.title}>
-                                        <span class="truncate pr-2">{l4.title}</span>
-                                        {#if l4.children.length > 0}
-                                          <span class="text-slate-600 text-[9px] transition-transform {l4.expanded ? 'rotate-90 text-teal-400' : ''}">▶</span>
-                                        {/if}
-                                      </button>
-                                      
-                                      {#if l4.expanded && l4.children.length > 0}
-                                        <div class="ml-2 pl-1">
-                                          {#each l4.children as l5}
-                                            <button 
-                                              class="w-full text-left py-0.5 px-2 hover:bg-slate-800 hover:text-teal-400 rounded transition-colors block text-[10px] text-slate-600 truncate cursor-pointer"
-                                              on:click={() => { changePdfPage(l5.page); }}
-                                              title={l5.title}>
-                                              • {l5.title}
-                                            </button>
-                                          {/each}
-                                        </div>
-                                      {/if}
-                                    </div>
-                                  {/each}
-                                </div>
-                              {/if}
-                            </div>
-                          {/each}
-                        </div>
-                      {/if}
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-          {/each}
-        {/if}
-      </div>
-    </section>
-
-    <!-- Resizer Handle -->
-    <div class="w-4 shrink-0 flex items-center justify-center cursor-col-resize group z-10 mx-1" on:mousedown={startResize} title="Drag to resize">
-      <div class="w-1 h-12 bg-slate-700 rounded-full group-hover:bg-teal-500 transition-colors duration-300"></div>
-    </div>
-    {/if}
-
-    <!-- PDF Viewer -->
-    <section class="bg-slate-900 border border-slate-800 rounded-xl shadow-xl flex flex-col h-full overflow-hidden relative flex-1" style="{isResizing || isResizingCompanion ? 'pointer-events: none;' : ''}">
-      <div class="absolute top-3 left-3 z-10 flex gap-2">
-        <button class="bg-slate-900/80 backdrop-blur border border-slate-700 p-2 rounded-lg shadow-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800 transition-colors pointer-events-auto" on:click={() => showToc = !showToc} title="Toggle Table of Contents">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
-        </button>
-        <button class="bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-lg shadow-lg text-xs font-bold transition-colors pointer-events-auto flex items-center gap-2 {showCompanion ? 'bg-amber-500 text-slate-950 border-amber-500 hover:bg-amber-400' : 'text-amber-400 hover:bg-amber-500/20'}" on:click={() => showCompanion = !showCompanion}>
-          {showCompanion ? 'Close Companion' : '📖 Reading Companion'}
-        </button>
-        <div class="bg-slate-900/80 backdrop-blur border border-slate-700 px-2 py-1.5 rounded-lg shadow-lg pointer-events-auto hidden md:flex items-center gap-1">
-          <button class="text-slate-400 hover:text-teal-400 px-1 cursor-pointer font-bold" on:click={() => pdfPage > 1 ? pdfPage-- : null} title="Previous Jump">&lt;</button>
-          <span class="text-[10px] font-bold tracking-wider text-slate-500 uppercase">Jump To</span>
-          <input type="number" bind:value={pdfPage} class="w-10 bg-slate-950/50 border border-slate-700 rounded text-center text-xs text-teal-400 font-mono focus:outline-none focus:border-teal-500 py-0.5 transition-colors" min="1" title="Enter Page Number">
-          <button class="text-slate-400 hover:text-teal-400 px-1 cursor-pointer font-bold" on:click={() => pdfPage++} title="Next Jump">&gt;</button>
+      <!-- PDF Viewer Area -->
+      <section class="flex flex-col h-full overflow-hidden flex-1 relative">
+        
+        <!-- Floating Action Bar (Overlaying Native PDF Toolbar empty space) -->
+        <div class="absolute top-2.5 right-[280px] z-10 flex gap-2 items-center shadow-md rounded-lg pointer-events-none">
+          <button class="px-3 py-1.5 rounded-lg shadow-sm text-xs font-bold transition-colors pointer-events-auto flex items-center gap-2 {showCompanion ? 'bg-amber-500 text-slate-950 hover:bg-amber-400' : 'bg-slate-800/90 backdrop-blur text-amber-400 border border-slate-700 hover:bg-slate-700'}" on:click={() => showCompanion = !showCompanion}>
+            {showCompanion ? 'Close Companion' : '📖 Reading Companion'}
+          </button>
+          
+          <div class="bg-slate-800/90 backdrop-blur border border-slate-700 px-2 py-1.5 rounded-lg shadow-sm hidden md:flex items-center gap-1 pointer-events-auto">
+            <button class="text-slate-400 hover:text-teal-400 px-1 cursor-pointer font-bold" on:click={() => pdfPage > 1 ? pdfPage-- : null} title="Previous Jump">&lt;</button>
+            <span class="text-[10px] font-bold tracking-wider text-slate-500 uppercase">Jump</span>
+            <input type="number" bind:value={pdfPage} class="w-10 bg-slate-950/50 border border-slate-700 rounded text-center text-xs text-teal-400 font-mono focus:outline-none focus:border-teal-500 py-0.5 transition-colors" min="1" title="Enter Page Number">
+            <button class="text-slate-400 hover:text-teal-400 px-1 cursor-pointer font-bold" on:click={() => pdfPage++} title="Next Jump">&gt;</button>
+          </div>
         </div>
-      </div>
 
-      <div class="absolute top-3 right-3 z-10 flex gap-2">
-      </div>
-      
-      {#key pdfPage}
-        <iframe src={`http://localhost:8000/api/pdf#page=${pdfPage}&toolbar=0&navpanes=0`} type="application/pdf" class="w-full h-full rounded-xl" title="Credit Intelligence PDF"></iframe>
-      {/key}
-    </section>
+        <!-- PDF Iframe -->
+        <div class="flex-1 rounded-xl overflow-hidden shadow-xl bg-slate-900 border border-slate-800 relative z-0">
+          {#key pdfPage}
+            <iframe src={`http://localhost:8000/api/pdf#page=${pdfPage}&navpanes=1`} type="application/pdf" class="w-full h-full" title="Credit Intelligence PDF"></iframe>
+          {/key}
+        </div>
+      </section>
 
     <!-- Reading Companion Sidebar -->
     {#if showCompanion}
@@ -1494,8 +1395,9 @@
     {/if}
 
   </div>
-
   {/if}
+</div>
+{/if}
 
   <!-- ============================================== -->
   <!-- FLOATING CHATBOT WIDGET                        -->

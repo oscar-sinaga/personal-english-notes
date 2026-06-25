@@ -702,19 +702,19 @@ def get_rag_context(query: str, top_k: int = 10) -> str:
     top_chunk_indices = [idx for idx, score in ranked_chunks[:top_k]]
     
     # 2. LLM Compressive RAG / Fact Extraction
-    chunks_text = "\n\n".join([f"--- Page {rag_index_cache[idx]['page']} ---\n{rag_index_cache[idx]['text']}" for i, idx in enumerate(top_chunk_indices)])
+    chunks_text = "\n\n".join([f"--- Halaman {rag_index_cache[idx]['page']} ---\n{rag_index_cache[idx]['text']}" for i, idx in enumerate(top_chunk_indices)])
     
     try:
         extraction_prompt = f"""Given the user question: "{query}"
 
-Here are {top_k} excerpts from a Credit Scoring textbook:
+Here are {top_k} pages from a Credit Scoring textbook:
 {chunks_text}
 
-Task: Extract ALL factual points from these excerpts that directly answer or relate to the user's question. 
+Task: Extract ALL factual points from these pages that directly answer or relate to the user's question. 
 Be EXHAUSTIVE. Do NOT summarize or omit any details, examples, or exceptions. List every single relevant fact using bullet points. 
-For each fact, you MUST explicitly cite the [Page X] it came from at the end of the bullet point.
-Do not include any fluff or introductory text. 
-If none of the excerpts contain relevant information, output exactly "NONE"."""
+For each fact, you MUST explicitly cite the exact page number like "(Halaman X)" at the end of the bullet point, based on the "--- Halaman X ---" marker.
+NEVER use the word "Chunk" or "Excerpt". Always refer to them as "Halaman" or "Pages".
+If none of the pages contain relevant information, output exactly "NONE"."""
 
         extraction_response = client.chat.completions.create(
             model="gpt-4o-mini",
@@ -745,14 +745,30 @@ async def chat_with_bot(req: models.ChatRequest):
     def stream_generator():
         last_user_message = req.messages[-1].content if req.messages else ""
         
+        search_query = last_user_message
+        if len(req.messages) > 1:
+            try:
+                history_text = "\n".join([f"{m.role}: {m.content}" for m in req.messages[-4:]])
+                rewrite_prompt = f"Given the following conversation history, rewrite the LAST user message into a concise standalone search query for a document retrieval system. Resolve any pronouns (e.g., 'it', 'this book') or implicit references to previous concepts. If the last message is already standalone, output it as is. ONLY output the rewritten query, nothing else.\n\nHistory:\n{history_text}\n\nRewritten Query:"
+                rewrite_resp = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[{"role": "user", "content": rewrite_prompt}],
+                    max_tokens=100,
+                    temperature=0.0
+                )
+                search_query = rewrite_resp.choices[0].message.content.strip()
+                print(f"RAG: Rewritten Search Query -> {search_query}")
+            except Exception as e:
+                print("Query rewrite error:", e)
+
         is_credit_scoring_query = True
-        if last_user_message:
+        if search_query:
             try:
                 route_response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
                         {"role": "system", "content": "You are a query router. The user will ask a question. If the question is about Credit Scoring, Banking, Finance, or asking for definitions/explanations of terms from a book, output 'YES'. If the question is just small talk (e.g., 'Hello', 'Who are you'), asking for English grammar corrections, general language translation, or anything completely unrelated to banking/credit, output 'NO'. ONLY output 'YES' or 'NO'."},
-                        {"role": "user", "content": last_user_message}
+                        {"role": "user", "content": search_query}
                     ],
                     max_tokens=5,
                     temperature=0.0
@@ -767,9 +783,9 @@ async def chat_with_bot(req: models.ChatRequest):
                 print("Router error:", e)
                 
         context = ""
-        if is_credit_scoring_query and last_user_message:
+        if is_credit_scoring_query and search_query:
             try:
-                context = get_rag_context(last_user_message)
+                context = get_rag_context(search_query)
             except Exception as e:
                 print(f"RAG Error: {e}")
                 
@@ -777,7 +793,7 @@ async def chat_with_bot(req: models.ChatRequest):
         system_msg_content = "You are a friendly, encouraging, and highly knowledgeable English learning assistant. You help the user understand complex English texts, grammar, vocabulary, and concepts. Respond in Indonesian but use English terms when appropriate. Explain things simply.\n\nCRITICAL REQUIREMENT: For ANY mathematical formulas, equations, or variables, you MUST use LaTeX formatting. Enclose block equations in \\[ ... \\]. Enclose inline math variables in \\( ... \\). Do NOT use plain text formatting or markdown bolding for math."
         
         if context:
-            system_msg_content += f"\n\nUse the following excerpts from the user's PDF to inform your answer. Always cite the page number if you use the information.\n\n{context}"
+            system_msg_content += f"\n\nGunakan referensi dari PDF pengguna berikut untuk menjawab. Setiap baris fakta sudah mencantumkan nomor halamannya (contoh: Halaman 45). ANDA WAJIB menyebutkan nomor halamannya kepada pengguna persis seperti itu (misalnya: 'Di Halaman 45 dijelaskan bahwa...').\n\nPENTING: JANGAN PERNAH menggunakan kata 'Chunk', 'Excerpt', atau 'Potongan'. Selalu gunakan kata 'Halaman' atau 'Bab'.\n\nKonteks Dokumen:\n{context}"
             
         system_msg = {
             "role": "system", 
