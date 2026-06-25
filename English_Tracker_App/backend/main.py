@@ -9,10 +9,13 @@ import os
 import json
 import datetime
 import requests
+import tempfile
+from fpdf import FPDF
 from dotenv import load_dotenv
 from openai import OpenAI
 
 load_dotenv()
+client = OpenAI()
 
 # Create database tables
 models.Base.metadata.create_all(bind=database.engine)
@@ -59,9 +62,12 @@ class LogExport(BaseModel):
     pillar: str  # e.g., "Active_Writing"
     content: str
 
-class VocabularyCreate(BaseModel):
+class VocabRequest(BaseModel):
     term: str
     definition: str
+
+class AskAIRequest(BaseModel):
+    term: str
 
 class TranslateRequest(BaseModel):
     text: str
@@ -89,10 +95,42 @@ def update_progress(update: ProgressUpdate, db: Session = Depends(get_db)):
     db.refresh(record)
     return record
 
+@app.post("/api/vocabulary/ai_define")
+async def ai_define_vocab(req: AskAIRequest):
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a specialized dictionary for Credit Scoring, Finance, and Business English. Provide a brief explanation (max 2 sentences) for the given term, followed by 1 practical example sentence in English."},
+                {"role": "user", "content": f"Define this term: {req.term}"}
+            ]
+        )
+        definition = completion.choices[0].message.content
+        return {"definition": definition}
+    except Exception as e:
+        print("Error calling OpenAI:", e)
+        raise HTTPException(status_code=500, detail="Failed to get AI definition")
+
 @app.get("/api/vocabulary")
 def get_vocabulary(db: Session = Depends(get_db)):
     vocab = db.query(models.Vocabulary).order_by(models.Vocabulary.id.desc()).all()
     return vocab
+
+@app.post("/api/vocabulary/ai_define")
+async def ai_define_vocab(req: AskAIRequest):
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a specialized dictionary for Credit Scoring, Finance, and Business English. Provide a brief explanation (max 2 sentences) for the given term, followed by 1 practical example sentence in English."},
+                {"role": "user", "content": f"Define this term: {req.term}"}
+            ]
+        )
+        definition = completion.choices[0].message.content
+        return {"definition": definition}
+    except Exception as e:
+        print("Error calling OpenAI:", e)
+        raise HTTPException(status_code=500, detail="Failed to get AI definition")
 
 @app.post("/api/vocabulary")
 def add_vocabulary(vocab: VocabularyCreate, db: Session = Depends(get_db)):
@@ -102,6 +140,57 @@ def add_vocabulary(vocab: VocabularyCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(record)
     return record
+
+@app.get("/api/vocabulary/export_pdf")
+def export_vocabulary_pdf(db: Session = Depends(get_db)):
+    vocabs = db.query(models.Vocabulary).order_by(models.Vocabulary.id.asc()).all()
+    
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", style="B", size=16)
+    pdf.cell(0, 10, "Smart Lexicon - Weekly Vocabulary", ln=True, align="C")
+    pdf.ln(10)
+    
+    pdf.set_font("Helvetica", size=11)
+    
+    for v in vocabs:
+        pdf.set_font("Helvetica", style="B", size=12)
+        pdf.cell(0, 8, v.term, ln=True)
+        
+        pdf.set_font("Helvetica", size=10)
+        pdf.multi_cell(0, 6, v.definition)
+        pdf.ln(4)
+        
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    pdf.output(temp_file.name)
+    
+    return FileResponse(temp_file.name, media_type="application/pdf", filename="Smart_Lexicon.pdf")
+
+@app.get("/api/vocabulary/export_pdf")
+def export_vocabulary_pdf(db: Session = Depends(get_db)):
+    vocabs = db.query(models.Vocabulary).order_by(models.Vocabulary.id.asc()).all()
+    
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Helvetica", style="B", size=16)
+    pdf.cell(0, 10, "Smart Lexicon - Weekly Vocabulary", ln=True, align="C")
+    pdf.ln(10)
+    
+    pdf.set_font("Helvetica", size=11)
+    
+    for v in vocabs:
+        pdf.set_font("Helvetica", style="B", size=12)
+        pdf.cell(0, 8, v.term, ln=True)
+        
+        pdf.set_font("Helvetica", size=10)
+        # Handle multi-line definitions nicely
+        pdf.multi_cell(0, 6, v.definition)
+        pdf.ln(4)
+        
+    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    pdf.output(temp_file.name)
+    
+    return FileResponse(temp_file.name, media_type="application/pdf", filename="Smart_Lexicon.pdf")
 
 @app.post("/api/sessions")
 def log_session(session_data: SessionCreate, db: Session = Depends(get_db)):
@@ -507,7 +596,7 @@ Bedah frasa-frasa atau struktur kalimat spesifik dari teks bahasa Inggrisnya (ji
 
 rag_index_cache = None
 
-def get_rag_context(query: str, top_k: int = 3) -> str:
+def get_rag_context(query: str, top_k: int = 10) -> str:
     global rag_index_cache
     import os
     import json
@@ -526,8 +615,25 @@ def get_rag_context(query: str, top_k: int = 3) -> str:
         return ""
         
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    # 1. Query Expansion
+    try:
+        expansion_response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are a credit scoring AI assistant. The user will give you a short query. Expand it into a clear, full English question asking for the definition, meaning, or impact of that term in the context of Credit Scoring and banking."},
+                {"role": "user", "content": query}
+            ],
+            max_tokens=50
+        )
+        expanded_query = expansion_response.choices[0].message.content.strip()
+        print(f"RAG: Expanded query -> {expanded_query}")
+    except Exception as e:
+        print(f"RAG Expansion Error: {e}")
+        expanded_query = query
+        
     response = client.embeddings.create(
-        input=query,
+        input=expanded_query,
         model="text-embedding-3-small"
     )
     query_vector = np.array(response.data[0].embedding)
@@ -546,11 +652,40 @@ def get_rag_context(query: str, top_k: int = 3) -> str:
     similarities.sort(key=lambda x: x[0], reverse=True)
     top_chunks = similarities[:top_k]
     
-    context = "Here are some relevant excerpts from the PDF book:\n\n"
-    for sim, chunk in top_chunks:
-        context += f"--- Page {chunk['page']} ---\n{chunk['text']}\n\n"
+    # 2. LLM Compressive RAG / Fact Extraction
+    chunks_text = "\n\n".join([f"--- Chunk {i} ---\n{c['text']}" for i, (s, c) in enumerate(top_chunks)])
+    
+    try:
+        extraction_prompt = f"""Given the user question: "{query}"
+
+Here are {top_k} excerpts from a Credit Scoring textbook:
+{chunks_text}
+
+Task: Extract ONLY the factual points from these excerpts that directly answer or relate to the user's question. 
+Write a highly condensed summary of these facts using bullet points. Do not include any fluff or introductory text. 
+If none of the excerpts contain relevant information, output exactly "NONE"."""
+
+        extraction_response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": extraction_prompt}],
+            max_tokens=300
+        )
         
-    return context
+        compressed_context = extraction_response.choices[0].message.content.strip()
+        print(f"RAG: Compressed context length -> {len(compressed_context)} chars")
+        
+        if compressed_context.strip() == "NONE":
+            return ""
+            
+        context = "Here are some extracted facts from the PDF book:\n\n" + compressed_context + "\n\n"
+        return context
+    except Exception as e:
+        print(f"RAG Compression Error: {e}")
+        # Fallback to pure text concatenation of top 2
+        context = "Here are some relevant excerpts from the PDF book:\n\n"
+        for s, chunk in top_chunks[:2]:
+            context += f"--- Page {chunk['page']} ---\n{chunk['text']}\n\n"
+        return context
 
 @app.post("/api/chat")
 async def chat_with_bot(req: models.ChatRequest):
@@ -565,8 +700,30 @@ async def chat_with_bot(req: models.ChatRequest):
     
     def stream_generator():
         last_user_message = req.messages[-1].content if req.messages else ""
-        context = ""
+        
+        is_credit_scoring_query = True
         if last_user_message:
+            try:
+                route_response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": "You are a query router. The user will ask a question. If the question is about Credit Scoring, Banking, Finance, or asking for definitions/explanations of terms from a book, output 'YES'. If the question is just small talk (e.g., 'Hello', 'Who are you'), asking for English grammar corrections, general language translation, or anything completely unrelated to banking/credit, output 'NO'. ONLY output 'YES' or 'NO'."},
+                        {"role": "user", "content": last_user_message}
+                    ],
+                    max_tokens=5,
+                    temperature=0.0
+                )
+                router_out = route_response.choices[0].message.content.strip().upper()
+                if "NO" in router_out:
+                    is_credit_scoring_query = False
+                    print("RAG Router: Skipped PDF search (Routed to NO)")
+                else:
+                    print("RAG Router: Proceeding with PDF search (Routed to YES)")
+            except Exception as e:
+                print("Router error:", e)
+                
+        context = ""
+        if is_credit_scoring_query and last_user_message:
             try:
                 context = get_rag_context(last_user_message)
             except Exception as e:

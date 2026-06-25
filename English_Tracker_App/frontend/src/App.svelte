@@ -29,6 +29,8 @@
   let newTerm = "";
   let newDef = "";
   let vocabStatus = "";
+  let isAskingAI = false;
+  let isExportingPDF = false;
 
   // Session Stats
   let sessionStats = { total_hours: 0, total_minutes: 0, last_topic: null };
@@ -160,7 +162,64 @@
         setTimeout(() => vocabStatus = "", 3000);
       }
     } catch (e) {
+      vocabStatus = "Failed to add term";
       console.error(e);
+    }
+  }
+
+  async function askAIVocab() {
+    if (!newTerm.trim()) {
+      vocabStatus = "Enter term first";
+      return;
+    }
+    isAskingAI = true;
+    vocabStatus = "Asking AI...";
+    try {
+      const res = await fetch(`${API_URL}/vocabulary/ai_define`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ term: newTerm })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        newDef = data.definition;
+        vocabStatus = "AI definition loaded!";
+        await addVocab();
+      } else {
+        vocabStatus = "AI failed";
+      }
+    } catch (e) {
+      console.error(e);
+      vocabStatus = "Error connecting to AI";
+    } finally {
+      isAskingAI = false;
+    }
+  }
+
+  async function exportVocabPDF() {
+    isExportingPDF = true;
+    vocabStatus = "Generating PDF...";
+    try {
+      const res = await fetch(`${API_URL}/vocabulary/export_pdf`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "Smart_Lexicon.pdf";
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        vocabStatus = "PDF Downloaded!";
+      } else {
+        vocabStatus = "Failed to export PDF";
+      }
+    } catch (e) {
+      console.error(e);
+      vocabStatus = "Error exporting PDF";
+    } finally {
+      isExportingPDF = false;
     }
   }
 
@@ -751,7 +810,7 @@
         </div>
         {#if !timerActive}
           <button class="px-3 h-full hover:bg-slate-800 text-slate-400 hover:text-teal-400 transition-colors flex items-center justify-center cursor-pointer" on:click={startTimer} title="Start Timer">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2e-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
           </button>
         {:else}
           <button class="px-3 h-full hover:bg-slate-800 text-amber-500 hover:text-amber-400 transition-colors flex items-center justify-center cursor-pointer" on:click={pauseTimer} title="Pause Timer">
@@ -1048,9 +1107,31 @@
         <input type="text" bind:value={newTerm} placeholder="Risk Term (e.g. LGD)" class="w-full bg-transparent border-b border-slate-800 text-sm text-slate-200 px-1 py-2 mb-2 focus:border-teal-500 outline-none">
         <textarea bind:value={newDef} rows="2" placeholder="English definition/circumlocution..." class="w-full bg-transparent text-sm text-slate-300 px-1 py-1 focus:outline-none resize-none mb-2"></textarea>
         <div class="flex justify-between items-center">
-          <button class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded cursor-pointer transition-colors" on:click={addVocab}>+ Add Term</button>
-          {#if vocabStatus} <span class="text-teal-400 text-xs">{vocabStatus}</span> {/if}
+          <div class="flex gap-2">
+            <button class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50" on:click={addVocab} disabled={isAskingAI}>+ Add Term</button>
+            <button class="text-xs bg-fuchsia-900/50 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1" on:click={askAIVocab} disabled={isAskingAI || !newTerm.trim()}>
+              {#if isAskingAI}
+                <svg class="animate-spin h-3 w-3 text-fuchsia-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Asking AI...
+              {:else}
+                🤖 Ask AI
+              {/if}
+            </button>
+          </div>
+          {#if vocabStatus} <span class="text-teal-400 text-xs truncate max-w-[80px]">{vocabStatus}</span> {/if}
         </div>
+      </div>
+
+      <div class="flex justify-between items-center mb-2 px-1">
+        <span class="text-xs text-slate-500 font-bold uppercase">Saved Lexicon</span>
+        <button class="text-[10px] bg-slate-800 hover:bg-teal-700 text-teal-400 hover:text-white px-2 py-1 rounded cursor-pointer transition-colors flex items-center gap-1 disabled:opacity-50" on:click={exportVocabPDF} disabled={isExportingPDF || vocabularies.length === 0}>
+          {#if isExportingPDF}
+            <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+          {:else}
+            🖨️
+          {/if}
+          Export PDF
+        </button>
       </div>
 
       <!-- Lexicon List (Scrollable) -->
@@ -1218,9 +1299,18 @@
             <p class="text-[10px] text-slate-400 mb-3 leading-relaxed">Found a new technical word? Save it directly to your Lexicon Bank.</p>
             <input type="text" bind:value={newTerm} placeholder="Risk Term (e.g. PD, LGD)" class="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 px-2 py-2 rounded mb-2 focus:border-teal-500 outline-none">
             <textarea bind:value={newDef} rows="2" placeholder="Translation or Definition..." class="w-full bg-slate-950 border border-slate-800 text-xs text-slate-300 px-2 py-2 rounded focus:outline-none resize-none mb-2 custom-scrollbar"></textarea>
-            <div class="flex justify-between items-center">
-              <button class="text-[10px] font-bold bg-teal-600 hover:bg-teal-500 text-slate-950 px-3 py-1.5 rounded cursor-pointer transition-colors" on:click={addVocab}>Save to Lexicon</button>
-              {#if vocabStatus} <span class="text-teal-400 text-[10px]">{vocabStatus}</span> {/if}
+            <div class="flex justify-between items-center gap-2">
+              <div class="flex gap-2">
+                <button class="text-xs bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50" on:click={addVocab} disabled={isAskingAI}>Save to Lexicon</button>
+                <button class="text-xs bg-fuchsia-900/50 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1" on:click={askAIVocab} disabled={isAskingAI || !newTerm.trim()}>
+                  {#if isAskingAI}
+                    <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                  {:else}
+                    🤖 Ask AI
+                  {/if}
+                </button>
+              </div>
+              {#if vocabStatus} <span class="text-teal-400 text-[10px] truncate max-w-[80px]">{vocabStatus}</span> {/if}
             </div>
 
             <!-- Saved Vocabularies -->

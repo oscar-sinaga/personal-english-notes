@@ -10,6 +10,8 @@
 
 | Tanggal & Waktu | Task | Git Commit | Status |
 |-----------------|------|------------|--------|
+| 2026-06-25 22:38 | Implement Phase 1 Advanced RAG (Compressive RAG, Smart Chunking, Metadata Enrichment, Query Routing) | `bda3a3e` | ✅ Done |
+| 2026-06-25 22:15 | Implement Smart Lexicon Vault with PDF Export and Ask AI Dictionary | `bda3a3e` | ✅ Done |
 | 2026-06-25 21:44 | Add AI RAG Chatbot with PDF Indexing and Saved Learnings History | `668c985` | ✅ Done |
 | 2026-06-17 00:28 | Implement Magic Vision for image explanation in ELI5 mode | `2fbf801` | ✅ Done |
 | 2026-06-17 00:10 | Implement streaming for Magic Explain using plain text chunks | `470134a` | ✅ Done |
