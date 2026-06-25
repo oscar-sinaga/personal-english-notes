@@ -16,6 +16,8 @@
   let currentPillarIndex = 0;
   const pillars = ["Active Writing", "Thinking & Circumlocution", "Role-Play"];
   let interval;
+  let activeTimerPillar = "";
+  let elapsedSessionSeconds = 0;
 
   let selectedTopic = syllabusData.length > 0 ? syllabusData[0].id : "";
   let logContent = "";
@@ -46,12 +48,27 @@
   let isResizing = false;
   let companionWidth = 320;
   let isResizingCompanion = false;
+  let showGrammarModal = false;
+  let showDictionaryModal = false;
+  let showInteractionsModal = false;
+
+  let savedInteractions = [];
+  let interactionsFilter = "All"; // 'All', 'Chatbot', 'Grammar', 'Explain'
+  let isFetchingInteractions = false;
   let showCompanion = false;
   let showToc = true;
   let showHeader = true;
   let doubtContent = "";
   let doubtImageBase64 = null;
   let doubtStatus = "";
+
+  // Chatbot State
+  let isChatOpen = false;
+  let chatMessages = [];
+  let chatInput = "";
+  let isChatLoading = false;
+  let chatContainer;
+
 
   const API_URL = "http://127.0.0.1:8000/api";
 
@@ -218,7 +235,10 @@
     timerActive = true;
     activeTimerPillar = appMode === 'reading' ? "Reading Comprehension" : pillars[currentPillarIndex];
     interval = setInterval(() => {
-      if (timeRemaining > 0) { timeRemaining--; } 
+      if (timeRemaining > 0) { 
+        timeRemaining--; 
+        elapsedSessionSeconds++;
+      } 
       else {
         clearInterval(interval);
         timerActive = false;
@@ -229,14 +249,17 @@
   }
   function pauseTimer() { timerActive = false; clearInterval(interval); }
   function nextPillar() {
+    if (elapsedSessionSeconds >= 60) logStudySession();
     if (currentPillarIndex < pillars.length - 1) {
       currentPillarIndex++;
+      elapsedSessionSeconds = 0;
       timeRemaining = customMinutes * 60;
       pauseTimer();
     }
   }
   function resetTimer() {
     currentPillarIndex = 0;
+    elapsedSessionSeconds = 0;
     timeRemaining = customMinutes * 60;
     pauseTimer();
   }
@@ -247,11 +270,10 @@
   }
 
   async function logStudySession() {
-    const elapsedSeconds = (customMinutes * 60) - timeRemaining;
-    const elapsedMins = Math.round(elapsedSeconds / 60);
+    const elapsedMins = Math.round(elapsedSessionSeconds / 60);
     
     if (elapsedMins <= 0) {
-      sessionStatus = "Too short to log.";
+      sessionStatus = "Too short to log (< 1 min).";
       setTimeout(() => sessionStatus = "", 2000);
       return;
     }
@@ -271,7 +293,9 @@
         sessionStatus = `Logged ${elapsedMins} mins!`;
         fetchSessionStats();
         fetchWeeklyStats();
+        elapsedSessionSeconds = 0;
         timeRemaining = customMinutes * 60; // Reset timer visually
+        pauseTimer();
       } else {
         sessionStatus = "Failed to log.";
       }
@@ -387,7 +411,7 @@
   async function explainDoubt() {
     if ((!doubtContent || !doubtContent.trim()) && !doubtImageBase64) return;
     isExplaining = true;
-    explainResult = { core_concept: "", practical_example: "", analogy: "", english_explanation: "" };
+    explainResult = { core_concept: "", practical_example: "", analogy: "", english_explanation: "", phrasing_breakdown: "" };
     doubtStatus = "Casting Magic Explain...";
     let rawText = "";
 
@@ -424,7 +448,8 @@
           core_concept: extractSection("[CORE_CONCEPT]", "[PRACTICAL_EXAMPLE]"),
           practical_example: extractSection("[PRACTICAL_EXAMPLE]", "[ANALOGY]"),
           analogy: extractSection("[ANALOGY]", "[ENGLISH_EXPLANATION]"),
-          english_explanation: extractSection("[ENGLISH_EXPLANATION]", null)
+          english_explanation: extractSection("[ENGLISH_EXPLANATION]", "[PHRASING_BREAKDOWN]"),
+          phrasing_breakdown: extractSection("[PHRASING_BREAKDOWN]", null)
         };
       }
       
@@ -436,6 +461,55 @@
       setTimeout(() => { doubtStatus = "" }, 3000);
     } finally {
       isExplaining = false;
+    }
+  }
+
+  function scrollToBottom() {
+    setTimeout(() => {
+      if (chatContainer) chatContainer.scrollTop = chatContainer.scrollHeight;
+    }, 50);
+  }
+
+  async function sendChatMessage() {
+    if (!chatInput.trim() || isChatLoading) return;
+    
+    const userMsg = { role: "user", content: chatInput.trim() };
+    chatMessages = [...chatMessages, userMsg];
+    chatInput = "";
+    isChatLoading = true;
+    scrollToBottom();
+    
+    chatMessages = [...chatMessages, { role: "assistant", content: "" }];
+    
+    try {
+      const res = await fetch(`${API_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: chatMessages.slice(0, -1) })
+      });
+      
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status}`);
+      }
+      
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        chatMessages[chatMessages.length - 1].content += chunk;
+        chatMessages = [...chatMessages];
+        scrollToBottom();
+      }
+    } catch (e) {
+      console.error(e);
+      chatMessages[chatMessages.length - 1].content = `Error: ${e.message || "Network Error"}`;
+      chatMessages = [...chatMessages];
+    } finally {
+      isChatLoading = false;
+      scrollToBottom();
     }
   }
 
@@ -461,6 +535,29 @@
       grammarError = "Network error while checking grammar.";
     } finally {
       isCheckingGrammar = false;
+    }
+  }
+
+  async function toggleDictionary() {
+    showDictionaryModal = !showDictionaryModal;
+    if (showDictionaryModal && dictResult === null) {
+      // maybe fetch random word of the day later
+    }
+  }
+
+  async function openInteractionsModal() {
+    showInteractionsModal = true;
+    isFetchingInteractions = true;
+    try {
+      const res = await fetch(`${API_URL}/interactions`);
+      if (res.ok) {
+        const data = await res.json();
+        savedInteractions = data.interactions || [];
+      }
+    } catch (e) {
+      console.error("Failed to load interactions", e);
+    } finally {
+      isFetchingInteractions = false;
     }
   }
 
@@ -546,6 +643,77 @@
 
 <main class="h-screen min-h-[800px] bg-slate-950 font-sans text-slate-100 p-4 md:p-6 flex flex-col select-none" style="{isResizing || isResizingCompanion ? 'cursor: col-resize;' : ''}">
   
+  <!-- Interactions Modal -->
+  {#if showInteractionsModal}
+  <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+    <div class="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-800/30 rounded-t-xl shrink-0">
+        <div>
+          <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-fuchsia-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+            Saved Learnings
+          </h2>
+          <p class="text-[11px] text-slate-400 uppercase tracking-widest mt-1">Your AI Interaction History</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <select bind:value={interactionsFilter} class="bg-slate-800 border border-slate-700 text-sm text-slate-300 rounded px-2 py-1 outline-none">
+            <option value="All">All Types</option>
+            <option value="Chatbot">Chatbot</option>
+            <option value="Grammar">Grammar</option>
+            <option value="Explain">Magic Explain</option>
+          </select>
+          <button class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors" on:click={() => showInteractionsModal = false}>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Body -->
+      <div class="flex-1 overflow-y-auto p-6 custom-scrollbar bg-slate-900 rounded-b-xl">
+        {#if isFetchingInteractions}
+          <div class="text-center py-10 text-slate-400 animate-pulse">Loading history...</div>
+        {:else if savedInteractions.length === 0}
+          <div class="text-center py-10 text-slate-500">No interactions saved yet. Start using Chatbot or Magic Explain!</div>
+        {:else}
+          <div class="flex flex-col gap-4">
+            {#each savedInteractions.filter(i => interactionsFilter === 'All' || i.interaction_type === interactionsFilter) as item}
+              <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-4 hover:bg-slate-800/60 transition-colors group">
+                <div class="flex items-center justify-between mb-3 border-b border-slate-700/50 pb-2">
+                  <span class="text-xs font-bold px-2 py-0.5 rounded {item.interaction_type === 'Chatbot' ? 'bg-sky-900/50 text-sky-400' : item.interaction_type === 'Grammar' ? 'bg-amber-900/50 text-amber-400' : 'bg-purple-900/50 text-purple-400'}">
+                    {item.interaction_type}
+                  </span>
+                  <span class="text-[10px] text-slate-500 font-mono">
+                    {new Date(item.created_at).toLocaleString()}
+                  </span>
+                </div>
+                
+                <div class="mb-3">
+                  <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Your Input</div>
+                  <div class="text-sm text-slate-300 italic border-l-2 border-slate-600 pl-3">"{item.input_text}"</div>
+                </div>
+                
+                <div>
+                  <div class="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-teal-500"></span> AI Response
+                  </div>
+                  <div class="text-sm text-slate-200 whitespace-pre-wrap bg-slate-950/30 p-3 rounded-md">
+                    {#if item.interaction_type === 'Grammar'}
+                      {@html item.response_text.replace(/\\n/g, '<br>')}
+                    {:else}
+                      {item.response_text}
+                    {/if}
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </div>
+  </div>
+  {/if}
+
   <!-- Top Navbar -->
   {#if showHeader}
   <header class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl mb-6 flex-shrink-0 relative z-20 transition-all">
@@ -592,6 +760,9 @@
         {/if}
         <button class="px-3 h-full border-l border-slate-700 hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition-colors flex items-center justify-center cursor-pointer" on:click={logStudySession} title="Log Time">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
+        </button>
+        <button class="px-3 h-full border-l border-slate-700 hover:bg-slate-800 text-fuchsia-400 hover:text-fuchsia-300 transition-colors flex items-center justify-center cursor-pointer font-bold text-[11px] uppercase tracking-wider" on:click={openInteractionsModal} title="Saved Learnings">
+          History
         </button>
       </div>
 
@@ -727,11 +898,7 @@
           <div class="flex justify-center gap-2 mb-6">
             <input type="number" bind:value={customMinutes} min="1" max="120" class="w-16 bg-slate-950 text-center rounded border border-slate-700 text-slate-200 outline-none focus:border-teal-500 text-sm py-1">
             <span class="text-slate-400 self-center text-xs">min</span>
-            <button on:click={() => { timeRemaining = customMinutes * 60; pauseTimer(); }} class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-bold text-slate-300 transition-colors cursor-pointer">Set Time</button>
-            <button class="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 rounded text-xs font-bold text-slate-100 transition-colors cursor-pointer ml-2 flex items-center gap-1" on:click={logStudySession} title="Manually log the time elapsed">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
-              Log Time
-            </button>
+            <button on:click={() => { timeRemaining = customMinutes * 60; elapsedSessionSeconds = 0; pauseTimer(); }} class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-bold text-slate-300 transition-colors cursor-pointer">Set Time</button>
             {#if sessionStatus} <span class="text-teal-400 self-center text-xs ml-2">{sessionStatus}</span> {/if}
           </div>
           <div class="flex justify-center gap-3">
@@ -740,6 +907,7 @@
             {:else}
               <button class="px-6 py-2 rounded-lg font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer" on:click={pauseTimer}>Pause</button>
             {/if}
+            <button class="px-6 py-2 rounded-lg font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors cursor-pointer disabled:opacity-50" on:click={logStudySession} disabled={elapsedSessionSeconds < 60}>Stop & Save</button>
             <button class="px-6 py-2 rounded-lg font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors cursor-pointer disabled:opacity-50" on:click={resetTimer}>Reset</button>
             <button class="px-6 py-2 rounded-lg font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50" on:click={nextPillar} disabled={currentPillarIndex === pillars.length - 1}>Next Stage</button>
           </div>
@@ -1140,6 +1308,10 @@
                   <span class="text-[10px] font-bold text-fuchsia-400 uppercase tracking-wider flex items-center gap-1 mb-1">🇬🇧 English Explanation</span>
                   <p class="text-[11px] text-slate-300 leading-relaxed italic bg-fuchsia-900/30 p-2 rounded border-l-2 border-fuchsia-500">{explainResult.english_explanation}</p>
                 </div>
+                <div>
+                  <span class="text-[10px] font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1 mb-1">🔍 Phrasing Breakdown</span>
+                  <p class="text-[11px] text-slate-300 leading-relaxed bg-teal-900/30 p-2 rounded border-l-2 border-teal-500">{explainResult.phrasing_breakdown}</p>
+                </div>
               </div>
             {/if}
 
@@ -1207,4 +1379,79 @@
 
   {/if}
 
+  <!-- ============================================== -->
+  <!-- FLOATING CHATBOT WIDGET                        -->
+  <!-- ============================================== -->
+  <button 
+    class="fixed bottom-6 right-6 z-[100] bg-gradient-to-r from-teal-500 to-sky-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:shadow-[0_0_25px_rgba(20,184,166,0.6)] hover:scale-105 transition-all cursor-pointer border-2 border-slate-900 group flex items-center gap-2"
+    on:click={() => { isChatOpen = !isChatOpen; if(isChatOpen) scrollToBottom(); }}
+  >
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+    {#if !isChatOpen}
+      <span class="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap font-bold text-sm">Ask AI Assistant</span>
+    {/if}
+  </button>
+
+  {#if isChatOpen}
+    <div class="fixed bottom-24 right-6 z-[100] w-80 md:w-96 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style="height: 500px; max-height: calc(100vh - 120px);">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-4 border-b border-slate-700 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-2">
+          <div class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
+          <span class="font-bold text-slate-200 text-sm">English AI Assistant</span>
+        </div>
+        <button class="text-slate-400 hover:text-white transition-colors cursor-pointer" on:click={() => isChatOpen = false}>
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+        </button>
+      </div>
+      
+      <!-- Messages -->
+      <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar bg-slate-950" bind:this={chatContainer}>
+        {#if chatMessages.length === 0}
+          <div class="text-center mt-10">
+            <div class="text-4xl mb-3">👋</div>
+            <h3 class="text-slate-300 font-bold mb-1">Hi there!</h3>
+            <p class="text-xs text-slate-500">I can help you understand grammar, explain difficult concepts, or translate phrases. What's on your mind?</p>
+          </div>
+        {/if}
+        {#each chatMessages as msg}
+          <div class="flex flex-col {msg.role === 'user' ? 'items-end' : 'items-start'}">
+            <span class="text-[9px] text-slate-500 font-bold uppercase mb-1 px-1">{msg.role === 'user' ? 'You' : 'AI Assistant'}</span>
+            <div class="p-3 rounded-2xl max-w-[85%] text-[13px] leading-relaxed shadow-sm whitespace-pre-wrap {msg.role === 'user' ? 'bg-teal-600 text-white rounded-tr-sm' : 'bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-sm'}">
+              {msg.content}
+            </div>
+          </div>
+        {/each}
+        {#if isChatLoading && (!chatMessages.length || chatMessages[chatMessages.length - 1].role !== 'assistant')}
+          <div class="flex flex-col items-start">
+            <div class="p-4 rounded-2xl bg-slate-800 border border-slate-700 rounded-tl-sm flex gap-1 items-center">
+              <div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
+              <div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
+              <div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
+            </div>
+          </div>
+        {/if}
+      </div>
+      
+      <!-- Input -->
+      <div class="p-3 bg-slate-900 border-t border-slate-700 shrink-0">
+        <form class="flex gap-2" on:submit|preventDefault={sendChatMessage}>
+          <input 
+            type="text" 
+            bind:value={chatInput} 
+            placeholder="Ask something..." 
+            class="flex-1 bg-slate-800 text-slate-200 text-sm rounded-xl px-4 py-2 border border-slate-700 focus:border-teal-500 focus:outline-none placeholder-slate-500 disabled:opacity-50"
+            disabled={isChatLoading}
+          >
+          <button 
+            type="submit" 
+            class="bg-teal-500 hover:bg-teal-400 text-slate-950 p-2.5 rounded-xl cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shrink-0"
+            disabled={!chatInput.trim() || isChatLoading}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  {/if}
 </main>

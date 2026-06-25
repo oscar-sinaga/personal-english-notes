@@ -27,6 +27,15 @@ class ExplainRequest(BaseModel):
     text: str
     image_base64: Optional[str] = None
 
+from typing import List
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+
 class Vocabulary(Base):
     __tablename__ = "vocabulary"
 
@@ -43,3 +52,13 @@ class StudySession(Base):
     pillar = Column(String)
     duration_minutes = Column(Integer)
     created_at = Column(String)
+
+class SavedInteraction(Base):
+    __tablename__ = "saved_interactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    interaction_type = Column(String, index=True)  # 'Chatbot', 'Grammar', 'Explain'
+    input_text = Column(Text)
+    response_text = Column(Text)
+    created_at = Column(String)
+

@@ -353,6 +353,23 @@ Format your response exactly as JSON with these keys:
         
         content = response.choices[0].message.content
         import json
+        
+        # Save interaction
+        db = database.SessionLocal()
+        try:
+            db_interaction = models.SavedInteraction(
+                interaction_type="Grammar",
+                input_text=req.text,
+                response_text=content,
+                created_at=datetime.datetime.now().isoformat()
+            )
+            db.add(db_interaction)
+            db.commit()
+        except Exception as db_e:
+            print("DB Error:", db_e)
+        finally:
+            db.close()
+            
         return json.loads(content)
         
     except Exception as e:
@@ -427,6 +444,9 @@ Sebuah analogi kreatif dan cerdas (tidak harus warung kopi, bisa apa saja yang r
 
 [ENGLISH_EXPLANATION]
 Berikan penjelasan (explanation) komprehensif mengenai konsep tersebut, TETAPI ditulis murni dalam bahasa INGGRIS yang sederhana (Intermediate B1/B2 level). Terkadang penjelasan dalam bahasa Inggris lebih mudah ditangkap maknanya.
+
+[PHRASING_BREAKDOWN]
+Bedah frasa-frasa atau struktur kalimat spesifik dari teks bahasa Inggrisnya (jika ada) dan berikan terjemahan padanan maknanya dalam bahasa Indonesia (misal: "Where applied by businesses" = "Jika diterapkan oleh perusahaan"). Ini sangat penting untuk membantu pengguna memahami cara menerjemahkan frasa ke bahasa Indonesia yang natural.
 """
 
         def stream_generator():
@@ -457,11 +477,170 @@ Berikan penjelasan (explanation) komprehensif mengenai konsep tersebut, TETAPI d
                 temperature=0.4,
                 stream=True
             )
+            full_response = ""
             for chunk in response:
                 if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
+                    text_chunk = chunk.choices[0].delta.content
+                    full_response += text_chunk
+                    yield text_chunk
+                    
+            # Save interaction
+            db = database.SessionLocal()
+            try:
+                db_interaction = models.SavedInteraction(
+                    interaction_type="Explain",
+                    input_text=req.text[:200] + "..." if len(req.text) > 200 else req.text,
+                    response_text=full_response,
+                    created_at=datetime.datetime.now().isoformat()
+                )
+                db.add(db_interaction)
+                db.commit()
+            except Exception as db_e:
+                print("DB Error:", db_e)
+            finally:
+                db.close()
 
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"OpenAI Error: {str(e)}")
+
+rag_index_cache = None
+
+def get_rag_context(query: str, top_k: int = 3) -> str:
+    global rag_index_cache
+    import os
+    import json
+    import numpy as np
+    from openai import OpenAI
+    
+    if rag_index_cache is None:
+        index_path = r"D:\ai_agent echancement\Belajar bahasa inggris\English_Tracker_App\backend\rag_index.json"
+        if os.path.exists(index_path):
+            with open(index_path, "r", encoding="utf-8") as f:
+                rag_index_cache = json.load(f)
+        else:
+            rag_index_cache = []
+            
+    if not rag_index_cache:
+        return ""
+        
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    response = client.embeddings.create(
+        input=query,
+        model="text-embedding-3-small"
+    )
+    query_vector = np.array(response.data[0].embedding)
+    
+    similarities = []
+    for chunk in rag_index_cache:
+        chunk_vec = np.array(chunk["vector"])
+        norm_q = np.linalg.norm(query_vector)
+        norm_c = np.linalg.norm(chunk_vec)
+        if norm_q == 0 or norm_c == 0:
+            sim = 0
+        else:
+            sim = np.dot(query_vector, chunk_vec) / (norm_q * norm_c)
+        similarities.append((sim, chunk))
+        
+    similarities.sort(key=lambda x: x[0], reverse=True)
+    top_chunks = similarities[:top_k]
+    
+    context = "Here are some relevant excerpts from the PDF book:\n\n"
+    for sim, chunk in top_chunks:
+        context += f"--- Page {chunk['page']} ---\n{chunk['text']}\n\n"
+        
+    return context
+
+@app.post("/api/chat")
+async def chat_with_bot(req: models.ChatRequest):
+    import os
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not set.")
+    
+    from openai import OpenAI
+    from fastapi.responses import StreamingResponse
+    client = OpenAI(api_key=api_key)
+    
+    def stream_generator():
+        last_user_message = req.messages[-1].content if req.messages else ""
+        context = ""
+        if last_user_message:
+            try:
+                context = get_rag_context(last_user_message)
+            except Exception as e:
+                print(f"RAG Error: {e}")
+                
+        # Insert a system message to guide the chatbot behavior
+        system_msg_content = "You are a friendly, encouraging, and highly knowledgeable English learning assistant. You help the user understand complex English texts, grammar, vocabulary, and concepts. Respond in Indonesian but use English terms when appropriate. Explain things simply."
+        
+        if context:
+            system_msg_content += f"\n\nUse the following excerpts from the user's PDF to inform your answer. Always cite the page number if you use the information.\n\n{context}"
+            
+        system_msg = {
+            "role": "system", 
+            "content": system_msg_content
+        }
+        
+        # Build the final messages list
+        messages = [system_msg] + [{"role": m.role, "content": m.content} for m in req.messages]
+        
+        try:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                max_tokens=800,
+                temperature=0.7,
+                stream=True
+            )
+            full_response = ""
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    text_chunk = chunk.choices[0].delta.content
+                    full_response += text_chunk
+                    yield text_chunk
+            
+            # Save interaction
+            import datetime
+            import database
+            db = database.SessionLocal()
+            try:
+                db_interaction = models.SavedInteraction(
+                    interaction_type="Chatbot",
+                    input_text=last_user_message,
+                    response_text=full_response,
+                    created_at=datetime.datetime.now().isoformat()
+                )
+                db.add(db_interaction)
+                db.commit()
+            except Exception as db_e:
+                print("DB Error:", db_e)
+            finally:
+                db.close()
+                
+        except Exception as e:
+            yield f"Error: {str(e)}"
+    return StreamingResponse(stream_generator(), media_type="text/event-stream")
+
+@app.get("/api/interactions")
+def get_interactions():
+    import database
+    db = database.SessionLocal()
+    try:
+        interactions = db.query(models.SavedInteraction).order_by(models.SavedInteraction.id.desc()).all()
+        return {
+            "interactions": [
+                {
+                    "id": idx.id,
+                    "interaction_type": idx.interaction_type,
+                    "input_text": idx.input_text,
+                    "response_text": idx.response_text,
+                    "created_at": idx.created_at
+                } for idx in interactions
+            ]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
