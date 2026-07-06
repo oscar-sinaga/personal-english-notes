@@ -24,7 +24,7 @@ app = FastAPI()
 
 @app.get("/api/pdf")
 def get_pdf():
-    pdf_path = r"D:\ai_agent echancement\Belajar bahasa inggris\Materi Credit Scoring\Credit Inteligence\Credit Intelligence  Modelling Many Paths through the Forest of Credit Rating and Scoring (Raymond A. Anderson) (z-library.sk, 1lib.sk, z-lib.sk).pdf"
+    pdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "Materi Credit Scoring", "Credit Inteligence", "Credit Intelligence  Modelling Many Paths through the Forest of Credit Rating and Scoring (Raymond A. Anderson) (z-library.sk, 1lib.sk, z-lib.sk).pdf"))
     if os.path.exists(pdf_path):
         return FileResponse(pdf_path, media_type="application/pdf")
     return {"error": "File not found"}

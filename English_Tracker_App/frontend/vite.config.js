@@ -8,4 +8,8 @@ export default defineConfig({
     tailwindcss(),
     svelte(),
   ],
+  server: {
+    port: 4321,
+    strictPort: true,
+  }
 })

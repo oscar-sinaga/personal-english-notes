@@ -97,7 +97,7 @@
   let chatContainer;
 
 
-  const API_URL = "http://127.0.0.1:8000/api";
+  const API_URL = "http://127.0.0.1:6234/api";
 
   function buildTocTree(flatToc) {
     let root = [];
@@ -1201,11 +1201,10 @@
             <button class="text-slate-400 hover:text-teal-400 px-1 cursor-pointer font-bold" on:click={() => pdfPage++} title="Next Jump">&gt;</button>
           </div>
         </div>
-
         <!-- PDF Iframe -->
         <div class="flex-1 rounded-xl overflow-hidden shadow-xl bg-slate-900 border border-slate-800 relative z-0">
           {#key pdfPage}
-            <iframe src={`http://localhost:8000/api/pdf#page=${pdfPage}&navpanes=1`} type="application/pdf" class="w-full h-full" title="Credit Intelligence PDF"></iframe>
+            <iframe src={`http://localhost:6234/api/pdf#page=${pdfPage}&navpanes=1`} type="application/pdf" class="w-full h-full" title="Credit Intelligence PDF"></iframe>
           {/key}
         </div>
       </section>
