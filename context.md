@@ -8,7 +8,7 @@
 
 | Item | Nilai |
 |------|-------|
-| Working directory | `d:\ai_agent echancement\Belajar bahasa inggris` |
+| Working directory | `.` (Root folder repositori, menyesuaikan lokasi clone) |
 | OS | Windows 11 Home Single Language (10.0.26200) |
 | Shell | PowerShell |
 | Git repo | Ya — `git init` 2026-06-07, local only (branch `master`) |
@@ -42,7 +42,7 @@ Setup environment Python untuk proyek (folder "Belajar bahasa inggris" — kemun
 
 ## ✅ Status Saat Ini (Current State)
 
-- **Virtual environment SUDAH dibuat** menggunakan `uv` dengan **Python 3.13.12**.
+- **Virtual environment SUDAH dibuat ulang di PC ini** menggunakan `uv` dengan **Python 3.13.9**.
 - Lokasi venv: `.venv` di dalam folder kerja.
 - Cara aktivasi: `.venv\Scripts\activate`
 - Belum ada dependency/package yang diinstall.
@@ -97,4 +97,4 @@ Setup environment Python untuk proyek (folder "Belajar bahasa inggris" — kemun
 
 ---
 
-*Terakhir diperbarui: 2026-06-07 22:54*
+*Terakhir diperbarui: 2026-07-06 11:27*
