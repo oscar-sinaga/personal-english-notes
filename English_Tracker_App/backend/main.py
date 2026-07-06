@@ -95,21 +95,7 @@ def update_progress(update: ProgressUpdate, db: Session = Depends(get_db)):
     db.refresh(record)
     return record
 
-@app.post("/api/vocabulary/ai_define")
-async def ai_define_vocab(req: AskAIRequest):
-    try:
-        completion = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are a specialized dictionary for Credit Scoring, Finance, and Business English. Provide a brief explanation (max 2 sentences) for the given term, followed by 1 practical example sentence in English."},
-                {"role": "user", "content": f"Define this term: {req.term}"}
-            ]
-        )
-        definition = completion.choices[0].message.content
-        return {"definition": definition}
-    except Exception as e:
-        print("Error calling OpenAI:", e)
-        raise HTTPException(status_code=500, detail="Failed to get AI definition")
+
 
 @app.get("/api/vocabulary")
 def get_vocabulary(db: Session = Depends(get_db)):
@@ -133,7 +119,7 @@ async def ai_define_vocab(req: AskAIRequest):
         raise HTTPException(status_code=500, detail="Failed to get AI definition")
 
 @app.post("/api/vocabulary")
-def add_vocabulary(vocab: VocabularyCreate, db: Session = Depends(get_db)):
+def add_vocabulary(vocab: VocabRequest, db: Session = Depends(get_db)):
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     record = models.Vocabulary(term=vocab.term, definition=vocab.definition, created_at=timestamp)
     db.add(record)

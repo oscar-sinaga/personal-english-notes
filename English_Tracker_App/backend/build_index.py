@@ -6,8 +6,8 @@ import re
 from openai import OpenAI
 from pydantic import BaseModel
 
-pdf_path = r"D:\ai_agent echancement\Belajar bahasa inggris\Materi Credit Scoring\Inteligent Credit Scoring\Intelligent Credit Scoring Building and Implementing Better Credit Risk Scorecards, 2ed (Naeem Siddiqi) (z-library.sk, 1lib.sk, z-lib.sk).pdf"
-index_path = r"D:\ai_agent echancement\Belajar bahasa inggris\English_Tracker_App\backend\rag_index.json"
+pdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "Materi Credit Scoring", "Inteligent Credit Scoring", "Intelligent Credit Scoring Building and Implementing Better Credit Risk Scorecards, 2ed (Naeem Siddiqi) (z-library.sk, 1lib.sk, z-lib.sk).pdf"))
+index_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "rag_index.json"))
 
 def split_text_smartly(text, chunk_size=1500, overlap_size=250):
     # Fix broken newlines (replace single newline with space, keep double newlines)
