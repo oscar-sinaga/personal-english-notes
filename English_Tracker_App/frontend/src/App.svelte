@@ -1204,7 +1204,7 @@
         <!-- PDF Iframe -->
         <div class="flex-1 rounded-xl overflow-hidden shadow-xl bg-slate-900 border border-slate-800 relative z-0">
           {#key pdfPage}
-            <iframe src={`http://localhost:6234/api/pdf#page=${pdfPage}&navpanes=1`} type="application/pdf" class="w-full h-full" title="Credit Intelligence PDF"></iframe>
+            <iframe src={`http://localhost:6234/api/pdf?t={Date.now()}#page=${pdfPage}&pagemode=bookmarks`} type="application/pdf" class="w-full h-full" title="Credit Intelligence PDF"></iframe>
           {/key}
         </div>
       </section>
