@@ -4,6 +4,7 @@
   import { marked } from 'marked';
   import DOMPurify from 'dompurify';
   import markedKatex from 'marked-katex-extension';
+  import { draggable } from './draggable.js';
 
   marked.use(markedKatex({ 
     throwOnError: false,
@@ -1188,18 +1189,18 @@
       <!-- PDF Viewer Area -->
       <section class="flex flex-col h-full overflow-hidden flex-1 relative">
         
-        <!-- Floating Action Bar (Overlaying Native PDF Toolbar empty space) -->
-        <div class="absolute top-2.5 right-[280px] z-10 flex gap-2 items-center shadow-md rounded-lg pointer-events-none">
-          <button class="px-3 py-1.5 rounded-lg shadow-sm text-xs font-bold transition-colors pointer-events-auto flex items-center gap-2 {showCompanion ? 'bg-amber-500 text-slate-950 hover:bg-amber-400' : 'bg-slate-800/90 backdrop-blur text-amber-400 border border-slate-700 hover:bg-slate-700'}" on:click={() => showCompanion = !showCompanion}>
-            {showCompanion ? 'Close Companion' : '📖 Reading Companion'}
+        <!-- Floating Action Bar (Draggable) -->
+        <div class="fixed bottom-[5.5rem] right-6 z-[100] cursor-grab active:cursor-grabbing" use:draggable>
+          <button 
+            class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_25px_rgba(245,158,11,0.6)] hover:scale-105 transition-all cursor-pointer border-2 border-slate-900 group flex items-center gap-2"
+            on:click={() => showCompanion = !showCompanion}
+          >
+            <span class="text-white/60 mr-1 text-xs">⠿</span>
+            <span class="text-xl leading-none">📖</span>
+            <span class="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap font-bold text-sm">
+              {showCompanion ? 'Close Companion' : 'Reading Companion'}
+            </span>
           </button>
-          
-          <div class="bg-slate-800/90 backdrop-blur border border-slate-700 px-2 py-1.5 rounded-lg shadow-sm hidden md:flex items-center gap-1 pointer-events-auto">
-            <button class="text-slate-400 hover:text-teal-400 px-1 cursor-pointer font-bold" on:click={() => pdfPage > 1 ? pdfPage-- : null} title="Previous Jump">&lt;</button>
-            <span class="text-[10px] font-bold tracking-wider text-slate-500 uppercase">Jump</span>
-            <input type="number" bind:value={pdfPage} class="w-10 bg-slate-950/50 border border-slate-700 rounded text-center text-xs text-teal-400 font-mono focus:outline-none focus:border-teal-500 py-0.5 transition-colors" min="1" title="Enter Page Number">
-            <button class="text-slate-400 hover:text-teal-400 px-1 cursor-pointer font-bold" on:click={() => pdfPage++} title="Next Jump">&gt;</button>
-          </div>
         </div>
         <!-- PDF Iframe -->
         <div class="flex-1 rounded-xl overflow-hidden shadow-xl bg-slate-900 border border-slate-800 relative z-0">
@@ -1402,15 +1403,18 @@
   <!-- FLOATING CHATBOT WIDGET                        -->
   <!-- ============================================== -->
 
-  <button 
-    class="fixed bottom-6 right-6 z-[100] bg-gradient-to-r from-teal-500 to-sky-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:shadow-[0_0_25px_rgba(20,184,166,0.6)] hover:scale-105 transition-all cursor-pointer border-2 border-slate-900 group flex items-center gap-2"
-    on:click={() => { isChatOpen = !isChatOpen; if(isChatOpen) scrollToBottom(); }}
-  >
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-    {#if !isChatOpen}
-      <span class="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap font-bold text-sm">Ask AI Assistant</span>
-    {/if}
-  </button>
+  <div class="fixed bottom-6 right-6 z-[100] cursor-grab active:cursor-grabbing" use:draggable>
+    <button 
+      class="bg-gradient-to-r from-teal-500 to-sky-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:shadow-[0_0_25px_rgba(20,184,166,0.6)] hover:scale-105 transition-all cursor-pointer border-2 border-slate-900 group flex items-center gap-2"
+      on:click={() => { isChatOpen = !isChatOpen; if(isChatOpen) scrollToBottom(); }}
+    >
+      <span class="text-white/60 mr-1">⠿</span>
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
+      {#if !isChatOpen}
+        <span class="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap font-bold text-sm">Ask AI Assistant</span>
+      {/if}
+    </button>
+  </div>
 
   {#if isChatOpen}
     <div class="fixed {isChatMaximized ? 'inset-4 md:inset-10 z-[200] w-auto h-auto' : 'bottom-24 right-6 z-[100] w-80 md:w-96'} bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300" style="{isChatMaximized ? '' : 'height: 500px; max-height: calc(100vh - 120px);'}">

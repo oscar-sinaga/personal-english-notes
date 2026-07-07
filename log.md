@@ -12,6 +12,7 @@
 |-----------------|------|------------|--------|
 | 2026-07-06 11:36 | Install Node.js LTS dan ubah port (Backend: 6234, Frontend: 4321) | `(pending)` | ✅ Done |
 | 2026-07-06 11:28 | Setup virtual environment (uv, Python 3.13.9) di clone baru (PC kantor) | `400efdc` | ✅ Done |
+| 2026-07-07 16:11 | Implement draggable floating action buttons (Chatbot & Reading Companion) | `d814df9` | ✅ Done |
 | 2026-06-26 06:48 | Overlay companion on PDF toolbar and enforce page number citations for RAG | `e07fb8c` | ✅ Done |
 | 2026-06-26 06:07 | Optimize markdown rendering, KaTeX math formulas, PDF navigation, and text selection | `34941f3` | ✅ Done |
 | 2026-06-25 22:40 | Implement Smart Lexicon Vault and Phase 1 Advanced RAG (Smart Chunking, Metadata, Routing) | `cea779b` | ✅ Done |
