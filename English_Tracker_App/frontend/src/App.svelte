@@ -5,6 +5,9 @@
   import DOMPurify from 'dompurify';
   import markedKatex from 'marked-katex-extension';
   import { draggable } from './draggable.js';
+  import 'katex/dist/katex.min.css';
+  import PracticeJournal from './lib/PracticeJournal.svelte';
+  import { apiUrl as API_URL, contexts, requestJson, saveEntry, skills, statuses } from './practice.js';
 
   marked.use(markedKatex({ 
     throwOnError: false,
@@ -42,11 +45,22 @@
   const pillars = ["Active Writing", "Thinking & Circumlocution", "Role-Play"];
   let interval;
   let activeTimerPillar = "";
+  let activeTimerTopic = "";
   let elapsedSessionSeconds = 0;
+  let savingSession = false;
+  let lastSession = null;
 
   let selectedTopic = syllabusData.length > 0 ? syllabusData[0].id : "";
   let logContent = "";
-  let logPillar = "Active_Writing";
+  const emptyPractice = () => ({ id: null, version: 0, skill: 'Writing', context: 'Study',
+    status: 'draft', source: '', prompt: '', feedback: '', revision: '', session_id: null });
+  let practice = emptyPractice();
+  let savedSnapshot = "";
+  let savingPractice = false;
+  let showPracticeJournal = false;
+  let aiEnabled = false;
+  let onlineHelpers = false;
+  let books = null;
   let exportStatus = "";
 
   // Lexicon state
@@ -98,8 +112,6 @@
   let chatContainer;
 
 
-  const API_URL = "http://127.0.0.1:6234/api";
-
   function buildTocTree(flatToc) {
     let root = [];
     let stack = [{ level: 0, children: root }];
@@ -118,7 +130,7 @@
     return root;
   }
 
-  onMount(async () => {
+  onMount(() => {
     if (syllabusData.length > 0) {
       expandedBlocks[syllabusData[0].id] = true;
     }
@@ -127,6 +139,19 @@
     fetchToc();
     fetchSessionStats();
     fetchWeeklyStats();
+    requestJson('/config').then(config => {
+      aiEnabled = config.ai_enabled;
+      onlineHelpers = config.online_helpers;
+      books = config.books;
+    }).catch(() => { books = { anderson: false, siddiqi: false }; });
+    const warnUnsaved = event => {
+      if (hasUnsavedPractice()) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', warnUnsaved);
+    return () => window.removeEventListener('beforeunload', warnUnsaved);
   });
 
   async function fetchProgress() {
@@ -267,7 +292,11 @@
 
   function toggleDropdownBlock(id) { ddBlocks[id] = !ddBlocks[id]; ddBlocks = ddBlocks; }
   function toggleDropdownChapter(id) { ddChapters[id] = !ddChapters[id]; ddChapters = ddChapters; }
-  function selectTopic(id) { selectedTopic = id; topicDropdownOpen = false; }
+  function selectTopic(id) {
+    if (id !== selectedTopic) practice.session_id = null;
+    selectedTopic = id;
+    topicDropdownOpen = false;
+  }
 
   function changePdfPage(page) {
     pdfPage = page;
@@ -316,9 +345,12 @@
   }
 
   function startTimer() {
-    if (timerActive) return;
+    if (timerActive || savingSession) return;
     timerActive = true;
-    activeTimerPillar = appMode === 'reading' ? "Reading Comprehension" : pillars[currentPillarIndex];
+    if (!elapsedSessionSeconds) {
+      activeTimerPillar = appMode === 'reading' ? "Reading Comprehension" : pillars[currentPillarIndex];
+      activeTimerTopic = selectedTopic || "General";
+    }
     interval = setInterval(() => {
       if (timeRemaining > 0) { 
         timeRemaining--; 
@@ -333,8 +365,8 @@
     }, 1000);
   }
   function pauseTimer() { timerActive = false; clearInterval(interval); }
-  function nextPillar() {
-    if (elapsedSessionSeconds >= 60) logStudySession();
+  async function nextPillar() {
+    if (savingSession || (elapsedSessionSeconds >= 60 && !(await logStudySession()))) return;
     if (currentPillarIndex < pillars.length - 1) {
       currentPillarIndex++;
       elapsedSessionSeconds = 0;
@@ -355,90 +387,135 @@
   }
 
   async function logStudySession() {
+    if (savingSession) return false;
     const elapsedMins = Math.round(elapsedSessionSeconds / 60);
     
     if (elapsedMins <= 0) {
       sessionStatus = "Too short to log (< 1 min).";
       setTimeout(() => sessionStatus = "", 2000);
-      return;
+      return false;
     }
     
+    pauseTimer();
+    savingSession = true;
     sessionStatus = "Saving session...";
     try {
       const res = await fetch(`${API_URL}/sessions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
-          topic_id: selectedTopic || "General", 
+          topic_id: activeTimerTopic || selectedTopic || "General",
           pillar: activeTimerPillar || (appMode === 'reading' ? "Reading Comprehension" : pillars[currentPillarIndex]), 
           duration_minutes: elapsedMins 
         })
       });
       if (res.ok) {
+        lastSession = await res.json();
         sessionStatus = `Logged ${elapsedMins} mins!`;
         fetchSessionStats();
         fetchWeeklyStats();
         elapsedSessionSeconds = 0;
         timeRemaining = customMinutes * 60; // Reset timer visually
         pauseTimer();
+        return true;
       } else {
         sessionStatus = "Failed to log.";
       }
     } catch (e) {
       sessionStatus = "Error saving.";
+    } finally {
+      savingSession = false;
+      setTimeout(() => sessionStatus = "", 3000);
     }
-    setTimeout(() => sessionStatus = "", 3000);
+    return false;
+  }
+
+  function practicePayload() {
+    const { id, ...data } = practice;
+    return {
+      ...data, topic_id: selectedTopic || 'General', content: logContent.trim(),
+      session_id: practice.session_id ?? (!practice.version && lastSession?.topic_id === selectedTopic ? lastSession.id : null)
+    };
+  }
+
+  function snapshot(data) {
+    const { version, ...values } = data;
+    return JSON.stringify(values);
+  }
+
+  function hasUnsavedPractice() {
+    const data = practicePayload();
+    return Boolean(data.content || data.prompt || data.feedback || data.revision || data.source)
+      && snapshot(data) !== savedSnapshot;
+  }
+
+  function openPractice(entry) {
+    if (savingPractice || (hasUnsavedPractice() && !window.confirm('Discard the unsaved changes in this editor?'))) return false;
+    practice = entry
+      ? Object.fromEntries(Object.keys(emptyPractice()).map(key => [key, entry[key]]))
+      : emptyPractice();
+    logContent = entry?.content ?? '';
+    if (entry) selectedTopic = entry.topic_id;
+    savedSnapshot = entry ? snapshot(practicePayload()) : '';
+    grammarResult = null;
+    grammarError = '';
+    exportStatus = '';
+    appMode = 'dashboard';
+    return true;
   }
 
   async function submitLog() {
+    if (savingPractice || !logContent.trim()) return;
+    savingPractice = true;
     exportStatus = "Saving...";
+    practice.id ??= crypto.randomUUID();
+    const data = practicePayload();
     try {
-      const sanitizedFolder = selectedTopic.replace(/[^a-zA-Z0-9_\- ]/g, "").replace(/\s+/g, "_") || "General";
-      const res = await fetch(`${API_URL}/export-log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic_folder: sanitizedFolder, pillar: logPillar, content: logContent })
-      });
-      const data = await res.json();
-      exportStatus = `Saved in IDE: ${data.filepath.split('\\').pop()}`;
-      logContent = "";
-      setTimeout(() => { exportStatus = "" }, 5000);
-    } catch (e) {
-      exportStatus = "Failed to save.";
+      const entry = await saveEntry(practice.id, data);
+      practice = { ...practice, version: entry.version, session_id: entry.session_id };
+      savedSnapshot = snapshot(data);
+      exportStatus = entry.status === 'completed' ? 'Completed practice saved.' : 'Draft saved.';
+    } catch (issue) {
+      exportStatus = issue.message;
+    } finally {
+      savingPractice = false;
     }
   }
 
+  let pendingDoubtId = null;
+  let savingDoubt = false;
+
   async function submitDoubt() {
-    doubtStatus = "Sending to IDE...";
+    if (savingDoubt || !doubtContent.trim()) return;
+    savingDoubt = true;
+    pendingDoubtId ??= crypto.randomUUID();
+    const content = doubtContent.trim();
+    doubtStatus = "Saving question...";
     try {
-      const sanitizedFolder = selectedTopic.replace(/[^a-zA-Z0-9_\- ]/g, "").replace(/\s+/g, "_") || "General";
-      const res = await fetch(`${API_URL}/export-log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic_folder: sanitizedFolder, pillar: "Grammar_Doubt", content: doubtContent })
+      await saveEntry(pendingDoubtId, {
+        topic_id: selectedTopic || 'General', context: 'Study', skill: 'Reading',
+        prompt: 'Question from Reading Companion', content
       });
-      const data = await res.json();
-      doubtStatus = `Saved! Ask Antigravity IDE to check it.`;
-      doubtContent = "";
-      setTimeout(() => { doubtStatus = "" }, 8000);
-    } catch (e) {
-      doubtStatus = "Failed.";
+      pendingDoubtId = null;
+      if (doubtContent.trim() === content) doubtContent = "";
+      doubtStatus = "Question saved to the practice journal.";
+    } catch (issue) {
+      doubtStatus = issue.message;
+    } finally {
+      savingDoubt = false;
     }
   }
 
   function playAudio(text) {
-    try {
-      // Menggunakan API Youdao (sangat stabil & bebas token)
-      const url = `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(text)}&type=2`;
-      const audio = new Audio(url);
-      audio.play().catch(e => {
-        console.error("Audio error:", e);
-        alert("Gagal memutar. Mungkin browser memblokir audio.");
-      });
-    } catch (e) {
-      alert("Gagal memutar suara.");
+    if (!('speechSynthesis' in window)) {
+      window.alert('Speech playback is unavailable in this browser.');
+      return;
     }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en';
+    window.speechSynthesis.speak(utterance);
   }
+
   // Flat map for topic names
   let topicNames = {};
   let isTranslating = false;
@@ -466,6 +543,7 @@
         body: JSON.stringify({ text: doubtContent, mode: mode })
       });
       const data = await res.json();
+      if (!res.ok) throw new Error();
       translateResult = data;
       doubtStatus = "Translation complete!";
       setTimeout(() => { doubtStatus = "" }, 3000);
@@ -726,9 +804,9 @@
   $: progressPercent = totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0;
 </script>
 
-<svelte:head>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-</svelte:head>
+{#if showPracticeJournal}
+  <PracticeJournal close={() => showPracticeJournal = false} openEntry={openPractice} />
+{/if}
 
 <main class="h-screen min-h-[800px] bg-slate-950 font-sans text-slate-100 p-4 md:p-6 flex flex-col" style="{isResizing || isResizingCompanion ? 'cursor: col-resize;' : ''}">
   
@@ -817,7 +895,7 @@
         </p>
       </div>
     </div>
-    <div class="flex items-center gap-6">
+    <div class="flex flex-wrap items-center gap-3 md:gap-6">
       
       <!-- Mode Switcher Buttons -->
       <div class="flex border border-slate-700 rounded-lg p-1 bg-slate-950">
@@ -826,6 +904,9 @@
         </button>
         <button class="px-4 py-1.5 text-xs font-bold rounded-md transition-colors {appMode === 'reading' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => appMode = 'reading'}>
           Read Book
+        </button>
+        <button class="rounded-md px-4 py-1.5 text-xs font-bold text-teal-300 hover:bg-slate-800" on:click={() => showPracticeJournal = true}>
+          Practice Journal
         </button>
       </div>
 
@@ -1007,7 +1088,7 @@
           <div class="flex flex-col gap-1.5 relative">
             <span class="text-xs text-slate-500">Mapping Topic:</span>
             <button class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 text-left focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none flex justify-between items-center" on:click={() => topicDropdownOpen = !topicDropdownOpen}>
-              <span class="truncate">{topicNames[selectedTopic] || "Select Topic..."}</span>
+              <span class="truncate">{topicNames[selectedTopic] || selectedTopic || "Select Topic..."}</span>
               <svg class="w-4 h-4 text-slate-500 transition-transform {topicDropdownOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
 
@@ -1050,18 +1131,46 @@
             {/if}
           </div>
           <div class="flex flex-col gap-1.5">
-            <label for="pillar" class="text-xs text-slate-500">Activity Type:</label>
-            <select id="pillar" bind:value={logPillar} class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 cursor-pointer outline-none">
-              <option value="Active_Writing">Active Writing</option>
-              <option value="Circumlocution">Circumlocution</option>
-              <option value="Role_Play">Role-Play Summary</option>
+            <label for="practice-skill" class="text-xs text-slate-400">Skill</label>
+            <select id="practice-skill" bind:value={practice.skill} class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 cursor-pointer outline-none">
+              {#each skills as skill}<option value={skill}>{skill}</option>{/each}
             </select>
           </div>
         </div>
-        
-        <div class="flex-1 flex flex-col min-h-[200px]">
-          <textarea id="content" bind:value={logContent} class="flex-1 w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg p-4 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none resize-none" placeholder="Draft your technical summary here... (Markdown supported)"></textarea>
+        <div class="mb-3 grid grid-cols-2 gap-3">
+          <label class="grid gap-1 text-xs text-slate-400">Context
+            <select bind:value={practice.context} class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
+              {#each contexts as context}<option value={context}>{context}</option>{/each}
+            </select>
+          </label>
+          <label class="grid gap-1 text-xs text-slate-400">Status
+            <select bind:value={practice.status} class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
+              {#each Object.entries(statuses) as [value, label]}<option {value}>{label}</option>{/each}
+            </select>
+          </label>
         </div>
+
+        <div class="flex flex-col gap-1.5">
+          <label for="content" class="text-xs text-slate-400">Original response or transcript</label>
+          <textarea id="content" bind:value={logContent} maxlength="25000" rows="5" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg p-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none" placeholder="Write your explanation or paste your speaking transcript."></textarea>
+        </div>
+        <details class="mt-3 rounded-lg border border-slate-800 p-3">
+          <summary class="cursor-pointer text-sm text-slate-300">Source, prompt, feedback, and revision</summary>
+          <div class="mt-3 grid gap-3">
+            <label class="grid gap-1 text-xs text-slate-400">Source or case reference
+              <input bind:value={practice.source} maxlength="500" class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200" />
+            </label>
+            <label class="grid gap-1 text-xs text-slate-400">Exercise prompt
+              <textarea bind:value={practice.prompt} maxlength="5000" rows="2" class="rounded-lg border border-slate-800 bg-slate-950 p-2 text-sm text-slate-200"></textarea>
+            </label>
+            <label class="grid gap-1 text-xs text-slate-400">Feedback
+              <textarea bind:value={practice.feedback} maxlength="15000" rows="3" class="rounded-lg border border-slate-800 bg-slate-950 p-2 text-sm text-slate-200"></textarea>
+            </label>
+            <label class="grid gap-1 text-xs text-slate-400">Revised response
+              <textarea bind:value={practice.revision} maxlength="25000" rows="4" class="rounded-lg border border-slate-800 bg-slate-950 p-2 text-sm text-slate-200"></textarea>
+            </label>
+          </div>
+        </details>
 
         <!-- AI Grammar Checker Results -->
         {#if grammarError}
@@ -1083,15 +1192,26 @@
               <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Explanation</span>
               <p class="text-[11px] text-slate-400 mt-1">{grammarResult.explanation}</p>
             </div>
+            <button type="button" class="mt-2 text-xs font-semibold text-teal-300" on:click={() => {
+              practice.feedback = grammarResult.explanation || '';
+              practice.revision = grammarResult.corrected || '';
+            }}>Copy feedback and correction to this entry</button>
           </div>
         {/if}
         
+        {#if books && !aiEnabled}
+          <p class="mt-3 text-xs text-slate-400">AI helpers are off. You can write or paste a transcript and save it to the journal.</p>
+        {/if}
         <div class="mt-4 flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <button class="px-6 py-2 rounded-lg font-bold bg-white text-slate-900 hover:bg-slate-200 transition-colors disabled:opacity-50 cursor-pointer" on:click={submitLog} disabled={!logContent.trim() || isCheckingGrammar}>
-              Save to IDE
+          <div class="flex flex-wrap items-center gap-2">
+            <button class="px-4 py-2 rounded-lg font-bold bg-teal-400 text-slate-950 hover:bg-teal-300 transition-colors disabled:opacity-50 cursor-pointer" on:click={submitLog} disabled={!logContent.trim() || savingPractice}>
+              {savingPractice ? 'Saving…' : 'Save practice'}
             </button>
-            <button class="px-3 py-2 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-500 text-slate-100 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50" on:click={checkGrammar} disabled={!logContent.trim() || isCheckingGrammar}>
+            <button class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300" on:click={() => openPractice(null)} disabled={savingPractice}>New entry</button>
+            {#if practice.version}
+              <a class="px-2 text-sm text-teal-300 underline" href={API_URL + '/practice/' + practice.id + '/markdown'}>Markdown</a>
+            {/if}
+            <button class="px-3 py-2 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-500 text-slate-100 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50" on:click={checkGrammar} disabled={!aiEnabled || !logContent.trim() || isCheckingGrammar}>
               {#if isCheckingGrammar}
                 <svg class="animate-spin h-3 w-3 text-slate-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Checking...
@@ -1099,7 +1219,7 @@
                 🤖 Check Grammar
               {/if}
             </button>
-            <button class="px-3 py-2 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 {isRecording ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}" on:click={toggleRecording} disabled={isTranscribing || isCheckingGrammar}>
+            <button class="px-3 py-2 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 {isRecording ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}" on:click={toggleRecording} disabled={!aiEnabled || isTranscribing || isCheckingGrammar}>
               {#if isTranscribing}
                 <svg class="animate-spin h-3 w-3 text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Transcribing...
@@ -1135,7 +1255,7 @@
         <div class="flex justify-between items-center">
           <div class="flex gap-2">
             <button class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50" on:click={addVocab} disabled={isAskingAI}>+ Add Term</button>
-            <button class="text-xs bg-fuchsia-900/50 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1" on:click={askAIVocab} disabled={isAskingAI || !newTerm.trim()}>
+            <button class="text-xs bg-fuchsia-900/50 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1" on:click={askAIVocab} disabled={!aiEnabled || isAskingAI || !newTerm.trim()}>
               {#if isAskingAI}
                 <svg class="animate-spin h-3 w-3 text-fuchsia-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Asking AI...
@@ -1202,11 +1322,17 @@
             </span>
           </button>
         </div>
-        <!-- PDF Iframe -->
+        {#if books?.siddiqi}
+          <a class="mb-2 self-end text-sm text-teal-300 underline" href={API_URL + '/pdf?book=siddiqi'} target="_blank" rel="noreferrer">Open Siddiqi scorecard guide</a>
+        {/if}
         <div class="flex-1 rounded-xl overflow-hidden shadow-xl bg-slate-900 border border-slate-800 relative z-0">
-          {#key pdfPage}
-            <iframe src={`http://localhost:6234/api/pdf?t={Date.now()}#page=${pdfPage}&pagemode=bookmarks`} type="application/pdf" class="w-full h-full" title="Credit Intelligence PDF"></iframe>
-          {/key}
+          {#if books?.anderson}
+            {#key pdfPage}
+              <iframe src={API_URL + '/pdf#page=' + pdfPage + '&pagemode=bookmarks'} class="w-full h-full" title="Credit Intelligence PDF"></iframe>
+            {/key}
+          {:else}
+            <p class="p-5 text-sm text-slate-300">{books ? 'The Anderson PDF is missing from the private library.' : 'Loading the private library...'}</p>
+          {/if}
         </div>
       </section>
 
@@ -1231,7 +1357,7 @@
             <div class="flex justify-between items-center gap-2">
               <div class="flex gap-2">
                 <button class="text-xs bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50" on:click={addVocab} disabled={isAskingAI}>Save to Lexicon</button>
-                <button class="text-xs bg-fuchsia-900/50 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1" on:click={askAIVocab} disabled={isAskingAI || !newTerm.trim()}>
+                <button class="text-xs bg-fuchsia-900/50 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1" on:click={askAIVocab} disabled={!aiEnabled || isAskingAI || !newTerm.trim()}>
                   {#if isAskingAI}
                     <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                   {:else}
@@ -1275,7 +1401,7 @@
             {/if}
             <div class="flex flex-col gap-2">
               <div class="flex gap-2">
-                <button class="text-[10px] flex-1 font-bold bg-sky-600 hover:bg-sky-500 text-slate-950 px-2 py-2 rounded cursor-pointer transition-colors uppercase tracking-wider flex items-center justify-center gap-1" on:click={() => translateDoubt('quick')} disabled={!doubtContent || !doubtContent.trim() || isTranslating}>
+                <button class="text-[10px] flex-1 font-bold bg-sky-600 hover:bg-sky-500 text-slate-950 px-2 py-2 rounded cursor-pointer transition-colors uppercase tracking-wider flex items-center justify-center gap-1" on:click={() => translateDoubt('quick')} disabled={!onlineHelpers || !doubtContent.trim() || isTranslating}>
                   {#if isTranslating && translateMode === 'quick'}
                     <svg class="animate-spin h-3 w-3 text-slate-950" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     Translating...
@@ -1284,7 +1410,7 @@
                   {/if}
                 </button>
 
-                <button class="text-[10px] flex-1 font-bold bg-indigo-600 hover:bg-indigo-500 text-slate-100 px-2 py-2 rounded cursor-pointer transition-colors uppercase tracking-wider flex items-center justify-center gap-1" on:click={() => translateDoubt('comprehensive')} disabled={!doubtContent || !doubtContent.trim() || isTranslating}>
+                <button class="text-[10px] flex-1 font-bold bg-indigo-600 hover:bg-indigo-500 text-slate-100 px-2 py-2 rounded cursor-pointer transition-colors uppercase tracking-wider flex items-center justify-center gap-1" on:click={() => translateDoubt('comprehensive')} disabled={!onlineHelpers || !doubtContent.trim() || isTranslating}>
                   {#if isTranslating && translateMode === 'comprehensive'}
                     <svg class="animate-spin h-3 w-3 text-slate-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     Deep Scan...
@@ -1294,7 +1420,7 @@
                 </button>
               </div>
 
-              <button class="text-[10px] font-bold bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider flex items-center justify-center gap-1 shadow-[0_0_10px_rgba(192,38,211,0.5)] disabled:opacity-50 disabled:cursor-not-allowed" on:click={explainDoubt} disabled={(!doubtContent || !doubtContent.trim()) && !doubtImageBase64 || isExplaining}>
+              <button class="text-[10px] font-bold bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider flex items-center justify-center gap-1 shadow-[0_0_10px_rgba(192,38,211,0.5)] disabled:opacity-50 disabled:cursor-not-allowed" on:click={explainDoubt} disabled={!aiEnabled || (!doubtContent.trim() && !doubtImageBase64) || isExplaining}>
                 {#if isExplaining}
                   <svg class="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                   Thinking...
@@ -1303,7 +1429,7 @@
                 {/if}
               </button>
               
-              <button class="text-[10px] font-bold bg-amber-600 hover:bg-amber-500 text-slate-950 px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider" on:click={submitDoubt} disabled={!doubtContent || !doubtContent.trim()}>Save for AI Review</button>
+              <button class="text-[10px] font-bold bg-amber-600 hover:bg-amber-500 text-slate-950 px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider" on:click={submitDoubt} disabled={!doubtContent.trim() || savingDoubt}>Save question to journal</button>
               
               {#if doubtStatus} <span class="text-amber-400 text-[10px] text-center mt-1">{doubtStatus}</span> {/if}
             </div>

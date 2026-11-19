@@ -1,6 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response
 from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from deep_translator import GoogleTranslator
@@ -9,49 +8,57 @@ import os
 import json
 import datetime
 import requests
-import tempfile
+from pathlib import Path
+from typing import Literal
+from uuid import uuid4
 from fpdf import FPDF
 from dotenv import load_dotenv
 from openai import OpenAI
 
-load_dotenv()
-client = OpenAI()
+from database import get_db
+from practice import PracticeInput, router as practice_router, save_practice
+from settings import BACKEND_DIR, INDEX_PATH, book_path
 
-# Create database tables
+
+load_dotenv(BACKEND_DIR / ".env")
 models.Base.metadata.create_all(bind=database.engine)
+ONLINE_HELPERS = os.getenv("TRACKER_ONLINE_HELPERS", "1") == "1"
 
-app = FastAPI()
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(practice_router)
+
+
+def configured_api_key():
+    key = os.getenv("OPENAI_API_KEY", "").strip()
+    return key if ONLINE_HELPERS and key and "isi_key_anda" not in key.lower() else None
+
+
+def require_api_key():
+    key = configured_api_key()
+    if key is None:
+        raise HTTPException(503, "AI is not configured. You can still read, save, and export your work.")
+    return key
+
+
+@app.get("/api/config")
+def get_config():
+    return {
+        "ai_enabled": configured_api_key() is not None,
+        "online_helpers": ONLINE_HELPERS,
+        "books": {name: book_path(name) is not None for name in ("anderson", "siddiqi")},
+    }
 
 @app.get("/api/pdf")
-def get_pdf():
-    pdf_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "Materi Credit Scoring", "Credit Inteligence", "Credit Intelligence  Modelling Many Paths through the Forest of Credit Rating and Scoring (Raymond A. Anderson) (z-library.sk, 1lib.sk, z-lib.sk).pdf"))
-    if os.path.exists(pdf_path):
-        return FileResponse(pdf_path, media_type="application/pdf")
-    return {"error": "File not found"}
+def get_pdf(book: Literal["anderson", "siddiqi"] = "anderson"):
+    pdf_path = book_path(book)
+    if pdf_path is None:
+        raise HTTPException(404, "This book is not available in the private library.")
+    return FileResponse(pdf_path, media_type="application/pdf")
 
 @app.get("/api/toc")
 def get_toc():
-    toc_path = "toc.json"
-    if os.path.exists(toc_path):
-        with open(toc_path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return {"error": "TOC not found"}
-
-# Allow frontend to access API
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-def get_db():
-    db = database.SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+    with (BACKEND_DIR / "toc.json").open(encoding="utf-8") as stream:
+        return json.load(stream)
 
 class ProgressUpdate(BaseModel):
     module_name: str
@@ -103,9 +110,10 @@ def get_vocabulary(db: Session = Depends(get_db)):
     return vocab
 
 @app.post("/api/vocabulary/ai_define")
-async def ai_define_vocab(req: AskAIRequest):
+def ai_define_vocab(req: AskAIRequest):
+    api_key = require_api_key()
     try:
-        completion = client.chat.completions.create(
+        completion = OpenAI(api_key=api_key).chat.completions.create(
             model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a specialized dictionary for Credit Scoring, Finance, and Business English. Provide a brief explanation (max 2 sentences) for the given term, followed by 1 practical example sentence in English."},
@@ -114,9 +122,8 @@ async def ai_define_vocab(req: AskAIRequest):
         )
         definition = completion.choices[0].message.content
         return {"definition": definition}
-    except Exception as e:
-        print("Error calling OpenAI:", e)
-        raise HTTPException(status_code=500, detail="Failed to get AI definition")
+    except Exception:
+        raise HTTPException(status_code=502, detail="Could not get an AI definition.")
 
 @app.post("/api/vocabulary")
 def add_vocabulary(vocab: VocabRequest, db: Session = Depends(get_db)):
@@ -129,54 +136,33 @@ def add_vocabulary(vocab: VocabRequest, db: Session = Depends(get_db)):
 
 @app.get("/api/vocabulary/export_pdf")
 def export_vocabulary_pdf(db: Session = Depends(get_db)):
-    vocabs = db.query(models.Vocabulary).order_by(models.Vocabulary.id.asc()).all()
-    
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", style="B", size=16)
-    pdf.cell(0, 10, "Smart Lexicon - Weekly Vocabulary", ln=True, align="C")
-    pdf.ln(10)
-    
-    pdf.set_font("Helvetica", size=11)
-    
-    for v in vocabs:
-        pdf.set_font("Helvetica", style="B", size=12)
-        pdf.cell(0, 8, v.term, ln=True)
-        
-        pdf.set_font("Helvetica", size=10)
-        pdf.multi_cell(0, 6, v.definition)
-        pdf.ln(4)
-        
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    pdf.output(temp_file.name)
-    
-    return FileResponse(temp_file.name, media_type="application/pdf", filename="Smart_Lexicon.pdf")
+    font_candidates = [
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path(os.getenv("WINDIR", "C:/Windows")) / "Fonts" / "arial.ttf",
+    ]
+    if configured_font := os.getenv("TRACKER_PDF_FONT"):
+        font_candidates.insert(0, Path(configured_font))
+    font = next((path for path in font_candidates if path.is_file()), None)
+    if font is None:
+        raise HTTPException(503, "No Unicode font is configured for PDF export.")
 
-@app.get("/api/vocabulary/export_pdf")
-def export_vocabulary_pdf(db: Session = Depends(get_db)):
-    vocabs = db.query(models.Vocabulary).order_by(models.Vocabulary.id.asc()).all()
-    
     pdf = FPDF()
+    pdf.add_font("Tracker", fname=str(font))
     pdf.add_page()
-    pdf.set_font("Helvetica", style="B", size=16)
-    pdf.cell(0, 10, "Smart Lexicon - Weekly Vocabulary", ln=True, align="C")
-    pdf.ln(10)
-    
-    pdf.set_font("Helvetica", size=11)
-    
-    for v in vocabs:
-        pdf.set_font("Helvetica", style="B", size=12)
-        pdf.cell(0, 8, v.term, ln=True)
-        
-        pdf.set_font("Helvetica", size=10)
-        # Handle multi-line definitions nicely
-        pdf.multi_cell(0, 6, v.definition)
+    pdf.set_font("Tracker", size=16)
+    pdf.cell(0, 10, "Smart Lexicon - Vocabulary", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(6)
+    for item in db.query(models.Vocabulary).order_by(models.Vocabulary.id):
+        pdf.set_font("Tracker", size=12)
+        pdf.multi_cell(0, 7, item.term or "", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Tracker", size=10)
+        pdf.multi_cell(0, 6, item.definition or "", new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
-        
-    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-    pdf.output(temp_file.name)
-    
-    return FileResponse(temp_file.name, media_type="application/pdf", filename="Smart_Lexicon.pdf")
+    return Response(
+        bytes(pdf.output()), media_type="application/pdf",
+        headers={"Content-Disposition": 'attachment; filename="Smart_Lexicon.pdf"'},
+    )
+
 
 @app.post("/api/sessions")
 def log_session(session_data: SessionCreate, db: Session = Depends(get_db)):
@@ -238,26 +224,19 @@ def get_weekly_sessions(db: Session = Depends(get_db)):
     return result
 
 @app.post("/api/export-log")
-def export_log(log: LogExport):
-    # Base directory for saving files
-    base_dir = r"D:\ai_agent echancement\Belajar bahasa inggris\Materi Credit Scoring\Credit Inteligence"
-    
-    # Create topic folder if it doesn't exist
-    topic_dir = os.path.join(base_dir, log.topic_folder)
-    if not os.path.exists(topic_dir):
-        os.makedirs(topic_dir)
-        
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-    filename = f"{timestamp}_{log.pillar}.md"
-    filepath = os.path.join(topic_dir, filename)
-    
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(log.content)
-        
-    return {"message": "Success", "filepath": filepath}
+def export_log(log: LogExport, db: Session = Depends(get_db)):
+    entry_id = uuid4()
+    entry = save_practice(
+        entry_id,
+        PracticeInput(topic_id=log.topic_folder, source=log.pillar, content=log.content),
+        db,
+    )
+    return {"message": "Saved to journal", "filepath": f"practice-{entry_id}.md", "id": entry["id"]}
 
 @app.post("/api/translate")
 async def translate_text(req: TranslateRequest, db: Session = Depends(get_db)):
+    if not ONLINE_HELPERS:
+        raise HTTPException(503, "Online translation is off in the private workspace.")
     try:
         # Core translation using free Google Translate
         raw_translation = GoogleTranslator(source='auto', target='id').translate(req.text)
@@ -392,9 +371,7 @@ async def translate_text(req: TranslateRequest, db: Session = Depends(get_db)):
 @app.post("/api/check-grammar")
 def check_grammar(req: models.GrammarRequest):
     import os
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key or api_key == "" or "isi_key_anda" in api_key.lower():
-        raise HTTPException(status_code=400, detail="API Key OpenAI belum diisi di file .env. Silakan buka file backend/.env dan masukkan API Key Anda.")
+    api_key = require_api_key()
 
     try:
         client = OpenAI(api_key=api_key)
@@ -448,16 +425,14 @@ Format your response exactly as JSON with these keys:
         return json.loads(content)
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenAI Error: {str(e)}")
+        raise HTTPException(status_code=502, detail="AI feedback is unavailable.")
 
 @app.post("/api/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
     import tempfile
     import os
     
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key or api_key == "" or "isi_key_anda" in api_key.lower():
-        raise HTTPException(status_code=400, detail="API Key OpenAI belum diisi di file .env. Silakan buka file backend/.env dan masukkan API Key Anda.")
+    api_key = require_api_key()
 
     try:
         # Save uploaded file to a temporary file
@@ -484,14 +459,12 @@ async def transcribe_audio(audio: UploadFile = File(...)):
     except Exception as e:
         if 'temp_path' in locals() and os.path.exists(temp_path):
             os.remove(temp_path)
-        raise HTTPException(status_code=500, detail=f"Transcription Error: {str(e)}")
+        raise HTTPException(status_code=502, detail="Transcription is unavailable.")
 
 @app.post("/api/explain")
 def explain_concept(req: models.ExplainRequest):
     import os
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key or api_key == "" or "isi_key_anda" in api_key.lower():
-        raise HTTPException(status_code=400, detail="API Key OpenAI belum diisi di file .env. Silakan buka file backend/.env dan masukkan API Key Anda.")
+    api_key = require_api_key()
 
     try:
         from fastapi.responses import StreamingResponse
@@ -583,7 +556,7 @@ Bedah frasa-frasa atau struktur kalimat spesifik dari teks bahasa Inggrisnya (ji
         return StreamingResponse(stream_generator(), media_type="text/event-stream")
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"OpenAI Error: {str(e)}")
+        raise HTTPException(status_code=502, detail="AI feedback is unavailable.")
 
 rag_index_cache = None
 
@@ -600,9 +573,8 @@ def get_rag_context(query: str, top_k: int = 10) -> str:
     from rank_bm25 import BM25Okapi
     
     if rag_index_cache is None:
-        index_path = r"D:\ai_agent echancement\Belajar bahasa inggris\English_Tracker_App\backend\rag_index.json"
-        if os.path.exists(index_path):
-            with open(index_path, "r", encoding="utf-8") as f:
+        if INDEX_PATH.is_file():
+            with INDEX_PATH.open(encoding="utf-8") as f:
                 rag_index_cache = json.load(f)
         else:
             rag_index_cache = []
@@ -616,7 +588,7 @@ def get_rag_context(query: str, top_k: int = 10) -> str:
         tokenized_corpus = [chunk["text"].lower().split() for chunk in rag_index_cache]
         bm25_index_cache = BM25Okapi(tokenized_corpus)
         
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    client = OpenAI(api_key=require_api_key())
     
     # 1. Multi-Query Expansion
     queries = [query]
@@ -720,9 +692,7 @@ If none of the pages contain relevant information, output exactly "NONE"."""
 @app.post("/api/chat")
 async def chat_with_bot(req: models.ChatRequest):
     import os
-    api_key = os.getenv("OPENAI_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not set.")
+    api_key = require_api_key()
     
     from openai import OpenAI
     from fastapi.responses import StreamingResponse
@@ -779,7 +749,9 @@ async def chat_with_bot(req: models.ChatRequest):
         system_msg_content = "You are a friendly, encouraging, and highly knowledgeable English learning assistant. You help the user understand complex English texts, grammar, vocabulary, and concepts. Respond in Indonesian but use English terms when appropriate. Explain things simply.\n\nCRITICAL REQUIREMENT: For ANY mathematical formulas, equations, or variables, you MUST use LaTeX formatting. Enclose block equations in \\[ ... \\]. Enclose inline math variables in \\( ... \\). Do NOT use plain text formatting or markdown bolding for math."
         
         if context:
-            system_msg_content += f"\n\nGunakan referensi dari PDF pengguna berikut untuk menjawab. Setiap baris fakta sudah mencantumkan nomor halamannya (contoh: Halaman 45). ANDA WAJIB menyebutkan nomor halamannya kepada pengguna persis seperti itu (misalnya: 'Di Halaman 45 dijelaskan bahwa...').\n\nPENTING: JANGAN PERNAH menggunakan kata 'Chunk', 'Excerpt', atau 'Potongan'. Selalu gunakan kata 'Halaman' atau 'Bab'.\n\nKonteks Dokumen:\n{context}"
+            system_msg_content += f"\n\nCite each supported fact as 'Naeem Siddiqi, Intelligent Credit Scoring, 2nd ed., PDF page X' using the exact PDF page in the context. Do not invent citations.\n\nDocument context:\n{context}"
+        elif is_credit_scoring_query:
+            system_msg_content += "\n\nNo book passages were retrieved. Say so and do not invent page references."
             
         system_msg = {
             "role": "system", 
@@ -822,8 +794,8 @@ async def chat_with_bot(req: models.ChatRequest):
             finally:
                 db.close()
                 
-        except Exception as e:
-            yield f"Error: {str(e)}"
+        except Exception:
+            yield "AI response unavailable. Try again later."
     return StreamingResponse(stream_generator(), media_type="text/event-stream")
 
 @app.get("/api/interactions")

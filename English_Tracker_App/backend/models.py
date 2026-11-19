@@ -62,3 +62,22 @@ class SavedInteraction(Base):
     response_text = Column(Text)
     created_at = Column(String)
 
+
+class PracticeEntry(Base):
+    __tablename__ = "practice_entries"
+
+    id = Column(String(36), primary_key=True)
+    topic_id = Column(String(240), nullable=False, index=True)
+    skill = Column(String(20), nullable=False, index=True)
+    context = Column(String(12), nullable=False, index=True)
+    status = Column(String(12), nullable=False)
+    source = Column(Text, nullable=False)
+    prompt = Column(Text, nullable=False)
+    content = Column(Text, nullable=False)
+    feedback = Column(Text, nullable=False)
+    revision = Column(Text, nullable=False)
+    session_id = Column(Integer, index=True)
+    created_at = Column(String, nullable=False)
+    updated_at = Column(String, nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+
