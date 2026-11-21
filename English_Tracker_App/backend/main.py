@@ -53,7 +53,8 @@ def get_pdf(book: Literal["anderson", "siddiqi"] = "anderson"):
     pdf_path = book_path(book)
     if pdf_path is None:
         raise HTTPException(404, "This book is not available in the private library.")
-    return FileResponse(pdf_path, media_type="application/pdf")
+    return FileResponse(pdf_path, media_type="application/pdf", filename=f"{book}.pdf",
+                        content_disposition_type="inline")
 
 @app.get("/api/toc")
 def get_toc():
