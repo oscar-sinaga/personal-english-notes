@@ -7,6 +7,7 @@
   import { draggable } from './draggable.js';
   import 'katex/dist/katex.min.css';
   import DailyPractice from './lib/DailyPractice.svelte';
+  import BookReader from './lib/BookReader.svelte';
   import PracticeJournal from './lib/PracticeJournal.svelte';
   import { apiUrl as API_URL, contexts, requestJson, saveEntry, skills, statuses } from './practice.js';
 
@@ -81,14 +82,12 @@
   // App Layout State
   let appMode = "dashboard"; // 'dashboard' or 'reading'
   
-  // PDF TOC State
-  let tocData = [];
-  let tocTree = [];
-  let pdfPage = 1;
+  const bookTitles = { anderson: 'Anderson', siddiqi: 'Siddiqi' };
+  let currentBook = 'anderson';
+  let bookPages = { anderson: 1, siddiqi: 1 };
+  $: selectedBook = books?.[currentBook] ? currentBook : Object.keys(bookTitles).find(book => books?.[book]);
 
   // Reading Mode Layout State
-  let tocWidth = 320;
-  let isResizing = false;
   let companionWidth = 320;
   let isResizingCompanion = false;
   let showGrammarModal = false;
@@ -113,31 +112,12 @@
   let chatContainer;
 
 
-  function buildTocTree(flatToc) {
-    let root = [];
-    let stack = [{ level: 0, children: root }];
-    
-    flatToc.forEach((item, index) => {
-      const node = { ...item, id: index, children: [], expanded: false };
-      
-      while (stack[stack.length - 1].level >= item.level) {
-        stack.pop();
-      }
-      
-      stack[stack.length - 1].children.push(node);
-      stack.push(node);
-    });
-    
-    return root;
-  }
-
   onMount(() => {
     if (syllabusData.length > 0) {
       expandedBlocks[syllabusData[0].id] = true;
     }
     fetchProgress();
     fetchVocab();
-    fetchToc();
     fetchSessionStats();
     fetchWeeklyStats();
     requestJson('/config').then(config => {
@@ -171,17 +151,6 @@
       const res = await fetch(`${API_URL}/vocabulary`);
       vocabularies = await res.json();
     } catch (e) { console.error("Failed to fetch vocab.", e); }
-  }
-
-  async function fetchToc() {
-    try {
-      const res = await fetch(`${API_URL}/toc`);
-      const data = await res.json();
-      if (!data.error) {
-        tocData = data;
-        tocTree = buildTocTree(data);
-      }
-    } catch (e) { console.error("Failed to fetch TOC.", e); }
   }
 
   async function fetchSessionStats() {
@@ -297,31 +266,6 @@
     if (id !== selectedTopic) practice.session_id = null;
     selectedTopic = id;
     topicDropdownOpen = false;
-  }
-
-  function changePdfPage(page) {
-    pdfPage = page;
-  }
-
-  // --- Resize Handlers (TOC) ---
-  function startResize(e) {
-    isResizing = true;
-    document.addEventListener('mousemove', handleResize);
-    document.addEventListener('mouseup', stopResize);
-  }
-  function handleResize(e) {
-    if (isResizing) {
-      // 24px is the left padding of <main>
-      let newWidth = e.clientX - 24;
-      if (newWidth < 200) newWidth = 200;
-      if (newWidth > 800) newWidth = 800;
-      tocWidth = newWidth;
-    }
-  }
-  function stopResize() {
-    isResizing = false;
-    document.removeEventListener('mousemove', handleResize);
-    document.removeEventListener('mouseup', stopResize);
   }
 
   // --- Resize Handlers (Companion) ---
@@ -828,7 +772,7 @@
   <PracticeJournal close={() => showPracticeJournal = false} openEntry={openPractice} />
 {/if}
 
-<main class="min-h-dvh bg-slate-950 font-sans text-slate-100 p-3 lg:h-dvh lg:p-6 flex flex-col" style="{isResizing || isResizingCompanion ? 'cursor: col-resize;' : ''}">
+<main class="min-h-dvh bg-slate-950 font-sans text-slate-100 p-3 lg:h-dvh lg:p-6 flex flex-col" style="{isResizingCompanion ? 'cursor: col-resize;' : ''}">
   
   <!-- Interactions Modal -->
   {#if showInteractionsModal}
@@ -1327,32 +1271,33 @@
   <div class="flex flex-1 lg:min-h-0 lg:overflow-hidden relative z-10 w-full">
     <!-- Reading Mode Layout -->
     {#if appMode === 'reading'}
-    <div class="flex-1 min-h-0 flex gap-4 pb-4 w-full" style="{isResizing || isResizingCompanion ? 'pointer-events: none;' : ''}">
+    <div class="flex-1 min-h-0 flex gap-4 pb-4 w-full" style="{isResizingCompanion ? 'pointer-events: none;' : ''}">
       
       <!-- PDF Viewer Area -->
       <section class="flex min-w-0 flex-1 flex-col relative lg:h-full lg:overflow-hidden">
         
         <div class="mb-3 flex flex-wrap items-center gap-2">
-          {#if books?.anderson}
-            <a class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-300" href={API_URL + '/pdf#page=' + pdfPage} target="_blank" rel="noreferrer">Open Anderson PDF</a>
-          {/if}
-          {#if books?.siddiqi}
-            <a class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-300" href={API_URL + '/pdf?book=siddiqi'} target="_blank" rel="noreferrer">Open Siddiqi PDF</a>
-          {/if}
+          {#each Object.entries(bookTitles) as [book, title]}
+            {#if books?.[book]}
+              <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-300 aria-pressed:bg-teal-950"
+                aria-pressed={selectedBook === book} on:click={() => currentBook = book}>{title} PDF</button>
+            {/if}
+          {/each}
           <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-amber-200"
             aria-expanded={showCompanion} aria-controls={showCompanion ? 'reading-companion' : undefined} on:click={() => showCompanion = !showCompanion}>
             {showCompanion ? 'Hide reading notes' : 'Reading notes'}
           </button>
         </div>
-        <div class="flex-1 rounded-xl overflow-hidden shadow-xl bg-slate-900 border border-slate-800 relative z-0">
-          {#if books?.anderson}
-            {#key pdfPage}
-              <iframe src={API_URL + '/pdf#page=' + pdfPage + '&pagemode=bookmarks'} class="block w-full min-h-[60dvh] lg:h-full lg:min-h-0" title="Credit Intelligence PDF"></iframe>
-            {/key}
-          {:else}
-            <p class="p-5 text-sm text-slate-300">{books ? 'The Anderson PDF is missing from the private library.' : 'Loading the private library...'}</p>
-          {/if}
-        </div>
+        {#if selectedBook}
+          {#key selectedBook}
+            <BookReader url={API_URL + '/pdf?book=' + selectedBook} title={bookTitles[selectedBook]}
+              filename={selectedBook + '.pdf'} bind:page={bookPages[selectedBook]} />
+          {/key}
+        {:else}
+          <p class="rounded-xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-300">
+            {books ? 'No books are available in the private library.' : 'Loading the private library…'}
+          </p>
+        {/if}
       </section>
 
     <!-- Reading Companion Sidebar -->
