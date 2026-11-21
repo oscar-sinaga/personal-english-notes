@@ -1,11 +1,12 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import syllabusData from './syllabus.json';
   import { marked } from 'marked';
   import DOMPurify from 'dompurify';
   import markedKatex from 'marked-katex-extension';
   import { draggable } from './draggable.js';
   import 'katex/dist/katex.min.css';
+  import DailyPractice from './lib/DailyPractice.svelte';
   import PracticeJournal from './lib/PracticeJournal.svelte';
   import { apiUrl as API_URL, contexts, requestJson, saveEntry, skills, statuses } from './practice.js';
 
@@ -62,6 +63,7 @@
   let onlineHelpers = false;
   let books = null;
   let exportStatus = "";
+  let practiceEditor;
 
   // Lexicon state
   let vocabularies = [];
@@ -97,7 +99,6 @@
   let interactionsFilter = "All"; // 'All', 'Chatbot', 'Grammar', 'Explain'
   let isFetchingInteractions = false;
   let showCompanion = false;
-  let showToc = true;
   let showHeader = true;
   let doubtContent = "";
   let doubtImageBase64 = null;
@@ -344,6 +345,17 @@
     document.removeEventListener('mouseup', stopResizeCompanion);
   }
 
+  function setTimer() {
+    if (!Number.isInteger(customMinutes) || customMinutes < 1 || customMinutes > 120) {
+      sessionStatus = "Enter a whole number from 1 to 120.";
+      return;
+    }
+    sessionStatus = "";
+    timeRemaining = customMinutes * 60;
+    elapsedSessionSeconds = 0;
+    pauseTimer();
+  }
+
   function startTimer() {
     if (timerActive || savingSession) return;
     timerActive = true;
@@ -462,6 +474,14 @@
     exportStatus = '';
     appMode = 'dashboard';
     return true;
+  }
+
+  async function startDailyPractice(exercise, prompt) {
+    if (!openPractice(null)) return;
+    selectTopic(exercise.topic);
+    practice = { ...practice, skill: exercise.skill, source: 'Latihan Hari Ini', prompt };
+    await tick();
+    practiceEditor?.focus();
   }
 
   async function submitLog() {
@@ -808,7 +828,7 @@
   <PracticeJournal close={() => showPracticeJournal = false} openEntry={openPractice} />
 {/if}
 
-<main class="h-screen min-h-[800px] bg-slate-950 font-sans text-slate-100 p-4 md:p-6 flex flex-col" style="{isResizing || isResizingCompanion ? 'cursor: col-resize;' : ''}">
+<main class="min-h-dvh bg-slate-950 font-sans text-slate-100 p-3 lg:h-dvh lg:p-6 flex flex-col" style="{isResizing || isResizingCompanion ? 'cursor: col-resize;' : ''}">
   
   <!-- Interactions Modal -->
   {#if showInteractionsModal}
@@ -879,9 +899,9 @@
 
   <!-- Top Navbar -->
   {#if showHeader}
-  <header class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl mb-6 flex-shrink-0 relative z-20 transition-all">
-    <div class="flex items-center gap-4">
-      <div class="h-10 w-10 bg-teal-500/20 text-teal-400 rounded-lg flex items-center justify-center border border-teal-500/30">
+  <header class="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xl mb-4 shrink-0 relative z-20 sm:p-4 lg:mb-6">
+    <div class="flex min-w-0 items-center gap-3">
+      <div class="h-10 w-10 shrink-0 bg-teal-500/20 text-teal-400 rounded-lg flex items-center justify-center border border-teal-500/30">
         {#if appMode === 'dashboard'}
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
         {:else}
@@ -889,23 +909,23 @@
         {/if}
       </div>
       <div>
-        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white">Credit Risk Learning System</h1>
+        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white">English &amp; Credit Risk Tracker</h1>
         <p class="text-xs text-slate-400 font-mono tracking-wider">
-          {appMode === 'dashboard' ? 'PORTFOLIO TRACKER & LEXICON' : 'DEDICATED PDF VIEWER'}
+          {appMode === 'dashboard' ? 'Practice, progress, and vocabulary' : 'Credit risk library'}
         </p>
       </div>
     </div>
-    <div class="flex flex-wrap items-center gap-3 md:gap-6">
+    <div class="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
       
       <!-- Mode Switcher Buttons -->
-      <div class="flex border border-slate-700 rounded-lg p-1 bg-slate-950">
-        <button class="px-4 py-1.5 text-xs font-bold rounded-md transition-colors {appMode === 'dashboard' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => appMode = 'dashboard'}>
+      <div class="flex flex-wrap border border-slate-700 rounded-lg p-1 bg-slate-950">
+        <button class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'dashboard' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => appMode = 'dashboard'}>
           Dashboard
         </button>
-        <button class="px-4 py-1.5 text-xs font-bold rounded-md transition-colors {appMode === 'reading' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => appMode = 'reading'}>
+        <button class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'reading' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => appMode = 'reading'}>
           Read Book
         </button>
-        <button class="rounded-md px-4 py-1.5 text-xs font-bold text-teal-300 hover:bg-slate-800" on:click={() => showPracticeJournal = true}>
+        <button class="rounded-md px-2 py-2 text-xs font-bold text-teal-300 sm:px-4 hover:bg-slate-800" on:click={() => showPracticeJournal = true}>
           Practice Journal
         </button>
       </div>
@@ -933,20 +953,20 @@
       </div>
 
       <!-- Progress & Analytics -->
-      <div class="flex items-center">
+      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
         <!-- Focus Analytics -->
-        <div class="text-right border-l border-slate-800 pl-6 pr-6">
-          <div class="text-xs text-slate-400 mb-1">FOCUS HOURS (600H)</div>
+        <div class="border-l border-slate-800 pl-3">
+          <div class="text-xs text-slate-400 mb-1">FOCUS HOURS</div>
           <div class="flex items-center gap-3 justify-end">
             <span class="font-mono font-bold {sessionStats.total_hours > 100 ? 'text-teal-400' : 'text-sky-400'}">{sessionStats.total_hours} <span class="text-xs text-slate-500">h</span></span>
           </div>
         </div>
         
         <!-- Module Progress -->
-        <div class="text-right border-l border-slate-800 pl-6 pr-4">
-          <div class="text-xs text-slate-400 mb-1">OVERALL COMPLETION RISK</div>
+        <div class="border-l border-slate-800 pl-3">
+          <div class="text-xs text-slate-400 mb-1">COURSE PROGRESS</div>
           <div class="flex items-center gap-3">
-            <div class="w-32 h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div class="w-16 sm:w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
               <div class="h-full bg-teal-500 rounded-full transition-all duration-500" style="width: {progressPercent}%"></div>
             </div>
             <span class="font-mono font-bold {progressPercent > 50 ? 'text-teal-400' : 'text-amber-400'}">{progressPercent}%</span>
@@ -972,10 +992,10 @@
   <!-- DASHBOARD MODE LAYOUT (3-6-3)                  -->
   <!-- ============================================== -->
   {#if appMode === 'dashboard'}
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1 overflow-hidden relative z-10">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:flex-1 lg:min-h-0 relative z-10">
     
     <!-- Left Column: Syllabus Tree (Scrollable) -->
-    <section class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col h-full overflow-hidden">
+    <section class="min-w-0 lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-xl flex flex-col lg:max-h-full lg:overflow-hidden">
       
       <!-- Weekly Progress Chart -->
       <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b border-slate-800">Weekly Progress</h2>
@@ -1047,49 +1067,50 @@
     </section>
 
     <!-- Center Column: Main Operations (Timer & Logger) -->
-    <section class="lg:col-span-6 flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar pr-2">
+    <section class="order-first lg:order-none min-w-0 lg:col-span-6 flex flex-col gap-4 lg:gap-6 lg:max-h-full lg:overflow-y-auto custom-scrollbar lg:pr-2">
+      <DailyPractice start={startDailyPractice} />
       
       <!-- Timer Panel -->
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl relative overflow-hidden shrink-0">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-xl relative overflow-hidden shrink-0">
         <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-sky-500"></div>
-        <div class="flex justify-between items-center mb-4">
+        <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
           <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Phase Controller</h2>
           <span class="px-3 py-1 bg-slate-800 rounded-full text-xs font-mono text-teal-400 border border-slate-700">{pillars[currentPillarIndex]}</span>
         </div>
         
         <div class="text-center">
-          <div class="text-7xl font-black tracking-tight tabular-nums text-white mb-4 font-mono drop-shadow-[0_0_10px_rgba(20,184,166,0.3)]">
+          <div class="text-5xl sm:text-7xl font-black tracking-tight tabular-nums text-white mb-4 font-mono drop-shadow-[0_0_10px_rgba(20,184,166,0.3)]">
             {formatTime(timeRemaining)}
           </div>
-          <div class="flex justify-center gap-2 mb-6">
-            <input type="number" bind:value={customMinutes} min="1" max="120" class="w-16 bg-slate-950 text-center rounded border border-slate-700 text-slate-200 outline-none focus:border-teal-500 text-sm py-1">
+          <div class="flex flex-wrap justify-center items-center gap-2 mb-4">
+            <input type="number" aria-label="Duration in minutes" bind:value={customMinutes} min="1" max="120" class="w-16 bg-slate-950 text-center rounded border border-slate-700 text-slate-200 outline-none focus:border-teal-500 text-sm py-1">
             <span class="text-slate-400 self-center text-xs">min</span>
-            <button on:click={() => { timeRemaining = customMinutes * 60; elapsedSessionSeconds = 0; pauseTimer(); }} class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-bold text-slate-300 transition-colors cursor-pointer">Set Time</button>
+            <button on:click={setTimer} class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-bold text-slate-300 transition-colors cursor-pointer">Set Time</button>
             {#if sessionStatus} <span class="text-teal-400 self-center text-xs ml-2">{sessionStatus}</span> {/if}
           </div>
-          <div class="flex justify-center gap-3">
+          <div class="grid grid-cols-2 gap-2 xl:flex xl:flex-wrap xl:justify-center">
             {#if !timerActive}
-              <button class="px-6 py-2 rounded-lg font-bold bg-teal-500 hover:bg-teal-400 text-slate-950 transition-colors cursor-pointer" on:click={startTimer}>Start Run</button>
+              <button class="px-3 py-2 rounded-lg font-bold bg-teal-500 hover:bg-teal-400 text-slate-950 transition-colors cursor-pointer" on:click={startTimer}>Start Run</button>
             {:else}
-              <button class="px-6 py-2 rounded-lg font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer" on:click={pauseTimer}>Pause</button>
+              <button class="px-3 py-2 rounded-lg font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer" on:click={pauseTimer}>Pause</button>
             {/if}
-            <button class="px-6 py-2 rounded-lg font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors cursor-pointer disabled:opacity-50" on:click={logStudySession} disabled={elapsedSessionSeconds < 60}>Stop & Save</button>
-            <button class="px-6 py-2 rounded-lg font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors cursor-pointer disabled:opacity-50" on:click={resetTimer}>Reset</button>
-            <button class="px-6 py-2 rounded-lg font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50" on:click={nextPillar} disabled={currentPillarIndex === pillars.length - 1}>Next Stage</button>
+            <button class="px-3 py-2 rounded-lg font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors cursor-pointer disabled:opacity-50" on:click={logStudySession} disabled={elapsedSessionSeconds < 60}>Stop & Save</button>
+            <button class="px-3 py-2 rounded-lg font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors cursor-pointer disabled:opacity-50" on:click={resetTimer}>Reset</button>
+            <button class="px-3 py-2 rounded-lg font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50" on:click={nextPillar} disabled={currentPillarIndex === pillars.length - 1}>Next Stage</button>
           </div>
         </div>
       </div>
 
       <!-- Logger Panel -->
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl flex-1 flex flex-col">
-        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Documentation Input</h2>
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-xl flex-1 flex flex-col">
+        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Practice Editor</h2>
         
-        <div class="grid grid-cols-2 gap-4 mb-4">
-          <div class="flex flex-col gap-1.5 relative">
+        <div class="grid grid-cols-1 gap-3 mb-4 min-[420px]:grid-cols-2">
+          <div class="relative flex min-w-0 flex-col gap-1.5">
             <span class="text-xs text-slate-500">Mapping Topic:</span>
             <button class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 text-left focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none flex justify-between items-center" on:click={() => topicDropdownOpen = !topicDropdownOpen}>
-              <span class="truncate">{topicNames[selectedTopic] || selectedTopic || "Select Topic..."}</span>
-              <svg class="w-4 h-4 text-slate-500 transition-transform {topicDropdownOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+              <span class="min-w-0 truncate">{topicNames[selectedTopic] || selectedTopic || "Select Topic..."}</span>
+              <svg class="w-4 h-4 shrink-0 text-slate-500 transition-transform {topicDropdownOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
             </button>
 
             {#if topicDropdownOpen}
@@ -1152,9 +1173,9 @@
 
         <div class="flex flex-col gap-1.5">
           <label for="content" class="text-xs text-slate-400">Original response or transcript</label>
-          <textarea id="content" bind:value={logContent} maxlength="25000" rows="5" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg p-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none" placeholder="Write your explanation or paste your speaking transcript."></textarea>
+          <textarea id="content" bind:this={practiceEditor} bind:value={logContent} maxlength="25000" rows="5" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg p-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none" placeholder="Write your explanation or paste your speaking transcript."></textarea>
         </div>
-        <details class="mt-3 rounded-lg border border-slate-800 p-3">
+        <details open={Boolean(practice.prompt)} class="mt-3 rounded-lg border border-slate-800 p-3">
           <summary class="cursor-pointer text-sm text-slate-300">Source, prompt, feedback, and revision</summary>
           <div class="mt-3 grid gap-3">
             <label class="grid gap-1 text-xs text-slate-400">Source or case reference
@@ -1200,7 +1221,7 @@
         {/if}
         
         {#if books && !aiEnabled}
-          <p class="mt-3 text-xs text-slate-400">AI helpers are off. You can write or paste a transcript and save it to the journal.</p>
+          <p class="mt-3 text-xs text-slate-400">Write your answer, paste a transcript, or use your device’s keyboard dictation.</p>
         {/if}
         <div class="mt-4 flex items-center justify-between gap-2">
           <div class="flex flex-wrap items-center gap-2">
@@ -1211,6 +1232,7 @@
             {#if practice.version}
               <a class="px-2 text-sm text-teal-300 underline" href={API_URL + '/practice/' + practice.id + '/markdown'}>Markdown</a>
             {/if}
+            {#if aiEnabled}
             <button class="px-3 py-2 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-500 text-slate-100 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50" on:click={checkGrammar} disabled={!aiEnabled || !logContent.trim() || isCheckingGrammar}>
               {#if isCheckingGrammar}
                 <svg class="animate-spin h-3 w-3 text-slate-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -1229,6 +1251,7 @@
                 🎤 Record Speech
               {/if}
             </button>
+            {/if}
           </div>
           {#if exportStatus}
             <span class="text-teal-400 text-sm flex items-center gap-2">
@@ -1242,7 +1265,7 @@
     </section>
 
     <!-- Right Column: Lexicon Bank -->
-    <section class="lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-xl flex flex-col h-full overflow-hidden">
+    <section class="min-w-0 lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-xl flex flex-col lg:max-h-full lg:overflow-hidden">
       <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2 flex justify-between items-center">
         Technical Lexicon
         <span class="bg-slate-800 text-slate-300 text-xs px-2 py-0.5 rounded-full">{vocabularies.length} terms</span>
@@ -1301,34 +1324,30 @@
   <!-- ============================================== -->
   {:else}
   
-  <div class="flex flex-1 overflow-hidden relative z-10 w-full h-full">
+  <div class="flex flex-1 lg:min-h-0 lg:overflow-hidden relative z-10 w-full">
     <!-- Reading Mode Layout -->
     {#if appMode === 'reading'}
     <div class="flex-1 min-h-0 flex gap-4 pb-4 w-full" style="{isResizing || isResizingCompanion ? 'pointer-events: none;' : ''}">
       
       <!-- PDF Viewer Area -->
-      <section class="flex flex-col h-full overflow-hidden flex-1 relative">
+      <section class="flex min-w-0 flex-1 flex-col relative lg:h-full lg:overflow-hidden">
         
-        <!-- Floating Action Bar (Draggable) -->
-        <div class="fixed bottom-[5.5rem] right-6 z-[100] cursor-grab active:cursor-grabbing" use:draggable>
-          <button 
-            class="bg-gradient-to-r from-amber-500 to-orange-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(245,158,11,0.4)] hover:shadow-[0_0_25px_rgba(245,158,11,0.6)] hover:scale-105 transition-all cursor-pointer border-2 border-slate-900 group flex items-center gap-2"
-            on:click={() => showCompanion = !showCompanion}
-          >
-            <span class="text-white/60 mr-1 text-xs">⠿</span>
-            <span class="text-xl leading-none">📖</span>
-            <span class="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap font-bold text-sm">
-              {showCompanion ? 'Close Companion' : 'Reading Companion'}
-            </span>
+        <div class="mb-3 flex flex-wrap items-center gap-2">
+          {#if books?.anderson}
+            <a class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-300" href={API_URL + '/pdf#page=' + pdfPage} target="_blank" rel="noreferrer">Open Anderson PDF</a>
+          {/if}
+          {#if books?.siddiqi}
+            <a class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-300" href={API_URL + '/pdf?book=siddiqi'} target="_blank" rel="noreferrer">Open Siddiqi PDF</a>
+          {/if}
+          <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-amber-200"
+            aria-expanded={showCompanion} aria-controls={showCompanion ? 'reading-companion' : undefined} on:click={() => showCompanion = !showCompanion}>
+            {showCompanion ? 'Hide reading notes' : 'Reading notes'}
           </button>
         </div>
-        {#if books?.siddiqi}
-          <a class="mb-2 self-end text-sm text-teal-300 underline" href={API_URL + '/pdf?book=siddiqi'} target="_blank" rel="noreferrer">Open Siddiqi scorecard guide</a>
-        {/if}
         <div class="flex-1 rounded-xl overflow-hidden shadow-xl bg-slate-900 border border-slate-800 relative z-0">
           {#if books?.anderson}
             {#key pdfPage}
-              <iframe src={API_URL + '/pdf#page=' + pdfPage + '&pagemode=bookmarks'} class="w-full h-full" title="Credit Intelligence PDF"></iframe>
+              <iframe src={API_URL + '/pdf#page=' + pdfPage + '&pagemode=bookmarks'} class="block w-full min-h-[60dvh] lg:h-full lg:min-h-0" title="Credit Intelligence PDF"></iframe>
             {/key}
           {:else}
             <p class="p-5 text-sm text-slate-300">{books ? 'The Anderson PDF is missing from the private library.' : 'Loading the private library...'}</p>
@@ -1339,12 +1358,17 @@
     <!-- Reading Companion Sidebar -->
     {#if showCompanion}
       <!-- Resizer Handle for Companion -->
-      <div class="w-4 shrink-0 flex items-center justify-center cursor-col-resize group z-10 mx-1" on:mousedown={startResizeCompanion} title="Drag to resize">
+      <div class="hidden w-4 shrink-0 lg:flex items-center justify-center cursor-col-resize group z-10 mx-1" on:mousedown={startResizeCompanion} title="Drag to resize">
         <div class="w-1 h-12 bg-slate-700 rounded-full group-hover:bg-amber-500 transition-colors duration-300"></div>
       </div>
 
-      <section class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-xl flex flex-col h-full overflow-hidden shrink-0 transition-all" style="width: {companionWidth}px;">
-        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Reading Companion</h2>
+      <section id="reading-companion" aria-labelledby="companion-title"
+        class="fixed inset-x-0 bottom-0 z-30 flex max-h-[45dvh] shrink-0 flex-col overflow-hidden rounded-t-xl border border-slate-700 bg-slate-900 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl lg:static lg:h-full lg:max-h-none lg:w-(--companion-width) lg:rounded-xl"
+        style:--companion-width="{companionWidth}px">
+        <div class="mb-3 flex shrink-0 items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <h2 id="companion-title" class="text-sm font-semibold text-slate-200">Reading Companion</h2>
+          <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm" on:click={() => showCompanion = false}>Close notes</button>
+        </div>
         
         <div class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-6">
           

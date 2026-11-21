@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from deep_translator import GoogleTranslator
 import database, models
 import os
@@ -83,7 +83,7 @@ class TranslateRequest(BaseModel):
 class SessionCreate(BaseModel):
     topic_id: str
     pillar: str
-    duration_minutes: int
+    duration_minutes: int = Field(strict=True, ge=1, le=120)
 
 @app.get("/api/progress")
 def get_progress(db: Session = Depends(get_db)):
