@@ -85,6 +85,7 @@
   const bookTitles = { anderson: 'Anderson', siddiqi: 'Siddiqi' };
   let currentBook = 'anderson';
   let bookPages = { anderson: 1, siddiqi: 1 };
+  let readerExpanded = false;
   $: selectedBook = books?.[currentBook] ? currentBook : Object.keys(bookTitles).find(book => books?.[book]);
 
   // Reading Mode Layout State
@@ -843,7 +844,7 @@
 
   <!-- Top Navbar -->
   {#if showHeader}
-  <header class="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xl mb-4 shrink-0 relative z-20 sm:p-4 lg:mb-6">
+  <header inert={readerExpanded} class="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xl mb-4 shrink-0 relative z-20 sm:p-4 lg:mb-6">
     <div class="flex min-w-0 items-center gap-3">
       <div class="h-10 w-10 shrink-0 bg-teal-500/20 text-teal-400 rounded-lg flex items-center justify-center border border-teal-500/30">
         {#if appMode === 'dashboard'}
@@ -926,7 +927,7 @@
   </header>
   {:else}
   <!-- Floating Show Header Button -->
-  <button class="fixed top-0 left-1/2 -translate-x-1/2 z-50 bg-slate-800 hover:bg-teal-600 text-slate-400 hover:text-slate-950 px-6 py-1 rounded-b-xl shadow-lg border-b border-x border-slate-700 hover:border-teal-500 transition-all cursor-pointer group flex flex-col items-center justify-center gap-0.5" on:click={() => showHeader = true} title="Show Top Navigation">
+  <button inert={readerExpanded} class="fixed top-0 left-1/2 -translate-x-1/2 z-50 bg-slate-800 hover:bg-teal-600 text-slate-400 hover:text-slate-950 px-6 py-1 rounded-b-xl shadow-lg border-b border-x border-slate-700 hover:border-teal-500 transition-all cursor-pointer group flex flex-col items-center justify-center gap-0.5" on:click={() => showHeader = true} title="Show Top Navigation">
     <span class="text-[9px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto overflow-hidden">Show Navbar</span>
     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
   </button>
@@ -1268,7 +1269,7 @@
   <!-- ============================================== -->
   {:else}
   
-  <div class="flex flex-1 lg:min-h-0 lg:overflow-hidden relative z-10 w-full">
+  <div class="flex flex-1 lg:min-h-0 lg:overflow-hidden relative z-10 w-full" style:z-index={readerExpanded ? 60 : undefined}>
     <!-- Reading Mode Layout -->
     {#if appMode === 'reading'}
     <div class="flex-1 min-h-0 flex gap-4 pb-4 w-full" style="{isResizingCompanion ? 'pointer-events: none;' : ''}">
@@ -1276,7 +1277,7 @@
       <!-- PDF Viewer Area -->
       <section class="flex min-w-0 flex-1 flex-col relative lg:h-full lg:overflow-hidden">
         
-        <div class="mb-3 flex flex-wrap items-center gap-2">
+        <div class="mb-3 flex flex-wrap items-center gap-2" inert={readerExpanded}>
           {#each Object.entries(bookTitles) as [book, title]}
             {#if books?.[book]}
               <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-300 aria-pressed:bg-teal-950"
@@ -1291,7 +1292,7 @@
         {#if selectedBook}
           {#key selectedBook}
             <BookReader url={API_URL + '/pdf?book=' + selectedBook} title={bookTitles[selectedBook]}
-              filename={selectedBook + '.pdf'} bind:page={bookPages[selectedBook]} />
+              filename={selectedBook + '.pdf'} bind:page={bookPages[selectedBook]} bind:expanded={readerExpanded} />
           {/key}
         {:else}
           <p class="rounded-xl border border-slate-800 bg-slate-900 p-5 text-sm text-slate-300">
@@ -1307,7 +1308,7 @@
         <div class="w-1 h-12 bg-slate-700 rounded-full group-hover:bg-amber-500 transition-colors duration-300"></div>
       </div>
 
-      <section id="reading-companion" aria-labelledby="companion-title"
+      <section id="reading-companion" aria-labelledby="companion-title" inert={readerExpanded}
         class="fixed inset-x-0 bottom-0 z-30 flex max-h-[45dvh] shrink-0 flex-col overflow-hidden rounded-t-xl border border-slate-700 bg-slate-900 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl lg:static lg:h-full lg:max-h-none lg:w-(--companion-width) lg:rounded-xl"
         style:--companion-width="{companionWidth}px">
         <div class="mb-3 flex shrink-0 items-center justify-between gap-2 border-b border-slate-800 pb-2">
@@ -1498,7 +1499,8 @@
   <!-- FLOATING CHATBOT WIDGET                        -->
   <!-- ============================================== -->
 
-  <div class="fixed bottom-6 right-6 z-[100] cursor-grab active:cursor-grabbing" use:draggable>
+  <div class="fixed bottom-6 right-6 z-[100] cursor-grab active:cursor-grabbing" use:draggable
+    inert={readerExpanded} style:visibility={readerExpanded ? 'hidden' : undefined}>
     <button 
       class="bg-gradient-to-r from-teal-500 to-sky-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:shadow-[0_0_25px_rgba(20,184,166,0.6)] hover:scale-105 transition-all cursor-pointer border-2 border-slate-900 group flex items-center gap-2"
       on:click={() => { isChatOpen = !isChatOpen; if(isChatOpen) scrollToBottom(); }}
@@ -1512,7 +1514,7 @@
   </div>
 
   {#if isChatOpen}
-    <div class="fixed {isChatMaximized ? 'inset-4 md:inset-10 z-[200] w-auto h-auto' : 'bottom-24 right-6 z-[100] w-80 md:w-96'} bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300" style="{isChatMaximized ? '' : 'height: 500px; max-height: calc(100vh - 120px);'}">
+    <div inert={readerExpanded} style:visibility={readerExpanded ? 'hidden' : undefined} class="fixed {isChatMaximized ? 'inset-4 md:inset-10 z-[200] w-auto h-auto' : 'bottom-24 right-6 z-[100] w-80 md:w-96'} bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300" style="{isChatMaximized ? '' : 'height: 500px; max-height: calc(100vh - 120px);'}">
       <!-- Header -->
       <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-4 border-b border-slate-700 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2">

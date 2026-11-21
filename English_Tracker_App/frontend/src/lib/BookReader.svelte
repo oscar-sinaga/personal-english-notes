@@ -1,11 +1,12 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import 'pdfjs-dist/web/pdf_viewer.css';
 
   export let url;
   export let title;
   export let filename;
   export let page = 1;
+  export let expanded = false;
 
   const supportUrl = import.meta.env.DEV
     ? '/node_modules/pdfjs-dist/'
@@ -20,6 +21,11 @@
   let canvas;
   let textContainer;
   let viewer;
+  let reader;
+  let expandButton;
+  let controlsButton;
+  let controlsVisible = false;
+  let nativeFullscreen = false;
   let width = 0;
   let zoom = 1;
   let sheetWidth = 0;
@@ -35,7 +41,7 @@
 
   $: requestedPage = page;
   $: if (documentProxy && width && canvas && textContainer) {
-    drawPage(documentProxy, page, width, zoom, canvas, textContainer);
+    drawPage(documentProxy, page, width, zoom, expanded, canvas, textContainer);
   }
 
   async function reportError(reason, pageDrawId = renderId) {
@@ -86,10 +92,54 @@
     }
   }
 
+  function enterFullscreen() {
+    expanded = true;
+    controlsVisible = false;
+    if (document.fullscreenEnabled && !document.fullscreenElement) {
+      // Browsers that decline native fullscreen still use the full viewport.
+      reader.requestFullscreen?.().catch(() => {});
+    }
+    tick().then(() => controlsButton?.focus({ preventScroll: true }));
+  }
+
+  async function restoreReader() {
+    if (!expanded) return;
+    expanded = false;
+    controlsVisible = false;
+    await tick();
+    expandButton?.focus({ preventScroll: true });
+  }
+
+  function syncFullscreen() {
+    const isNative = document.fullscreenElement === reader;
+    if (nativeFullscreen && !isNative) restoreReader();
+    nativeFullscreen = isNative;
+    if (isNative && !expanded) document.exitFullscreen().catch(() => {});
+  }
+
+  async function exitFullscreen() {
+    if (document.fullscreenElement === reader) {
+      try {
+        await document.exitFullscreen();
+      } catch {
+        return;
+      }
+    }
+    await restoreReader();
+  }
+
+  function handleKeydown(event) {
+    if (!expanded || event.key !== 'Escape') return;
+    event.preventDefault();
+    exitFullscreen();
+  }
+
   onMount(() => {
     loadBook();
+    document.addEventListener('fullscreenchange', syncFullscreen);
     return () => {
       live = false;
+      document.removeEventListener('fullscreenchange', syncFullscreen);
       renderTask?.cancel();
       textLayer?.cancel();
       loadingTask?.destroy().catch(() => {});
@@ -98,7 +148,7 @@
     };
   });
 
-  async function drawPage(book, number, availableWidth, magnification, surface, textHost) {
+  async function drawPage(book, number, availableWidth, magnification, fullSize, surface, textHost) {
     const id = ++renderId;
     renderTask?.cancel();
     textLayer?.cancel();
@@ -107,7 +157,8 @@
       const sourcePage = await book.getPage(number);
       if (!live || id !== renderId) return;
       const natural = sourcePage.getViewport({ scale: 1 });
-      const fit = Math.min(Math.max(1, availableWidth - 2), 980) / natural.width;
+      const fitWidth = Math.max(1, availableWidth - 2);
+      const fit = (fullSize ? fitWidth : Math.min(fitWidth, 980)) / natural.width;
       const viewport = sourcePage.getViewport({ scale: fit * magnification });
       // A single canvas keeps phone memory bounded, including at higher zoom.
       const ratio = Math.min(window.devicePixelRatio || 1, 2,
@@ -169,8 +220,18 @@
   }
 </script>
 
-<section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-xl" aria-label={title + ' reader'}>
-  <div class="flex flex-wrap items-center gap-2 border-b border-slate-800 p-2">
+<svelte:window on:keydown={handleKeydown} />
+
+<section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-xl"
+  class:reader-expanded={expanded} bind:this={reader} aria-label={title + ' reader'}>
+  {#if expanded}
+    <button type="button" class="reader-button controls-toggle" aria-controls="pdf-toolbar" aria-expanded={controlsVisible}
+      bind:this={controlsButton} on:click={() => controlsVisible = !controlsVisible}>
+      {controlsVisible ? 'Hide controls' : 'Show controls'}
+    </button>
+  {/if}
+  <div id="pdf-toolbar" class="reader-toolbar flex flex-wrap items-center gap-2 border-b border-slate-800 p-2"
+    hidden={expanded && !controlsVisible}>
     <button type="button" class="reader-button" on:click={() => showPage(page - 1)} disabled={!documentProxy || page <= 1}>Previous</button>
     <form class="flex items-center gap-1" on:submit|preventDefault={() => showPage(requestedPage)}>
       <input type="number" aria-label="Page number" class="w-16 rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm"
@@ -189,10 +250,15 @@
     {:else}
       <button type="button" class="reader-button text-teal-300" on:click={prepareDownload} disabled={!documentProxy || !!downloadRequest}>Prepare download</button>
     {/if}
+    {#if expanded}
+      <button type="button" class="reader-button" on:click={exitFullscreen}>Exit full screen</button>
+    {:else}
+      <button type="button" class="reader-button" bind:this={expandButton} on:click={enterFullscreen}>Full screen</button>
+    {/if}
     {#if downloadStatus}<span role="status" class="text-sm text-slate-300">{downloadStatus}</span>{/if}
   </div>
   <!-- svelte-ignore a11y_no_noninteractive_tabindex (Keyboard scrolling for the document viewport.) -->
-  <div class="relative h-[66dvh] overflow-auto bg-slate-800 lg:h-auto lg:min-h-0 lg:flex-1"
+  <div class="reader-viewport relative h-[66dvh] overflow-auto bg-slate-800 lg:h-auto lg:min-h-0 lg:flex-1"
     bind:this={viewer} bind:clientWidth={width} role="region" aria-label={title + ' pages'} tabindex="0">
     {#if error}
       <div class="p-4" role="alert">
@@ -212,6 +278,46 @@
 </section>
 
 <style>
+  :global(body:has(.reader-expanded)) {
+    overflow: hidden;
+  }
+  .reader-expanded {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    width: 100%;
+    height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  }
+  .reader-expanded .reader-viewport {
+    height: 100%;
+    overscroll-behavior: contain;
+  }
+  .reader-expanded .reader-toolbar,
+  .reader-expanded .controls-toggle {
+    position: absolute;
+    z-index: 15;
+    background: var(--color-slate-950);
+    border: 1px solid var(--color-slate-600);
+    box-shadow: 0 3px 12px rgb(0 0 0 / 40%);
+  }
+  .reader-expanded .reader-toolbar {
+    bottom: calc(3.5rem + env(safe-area-inset-bottom));
+    inset-inline: max(.5rem, env(safe-area-inset-left)) max(.5rem, env(safe-area-inset-right));
+    width: fit-content;
+    max-height: 50dvh;
+    margin-inline: auto;
+    overflow: auto;
+    border-radius: .75rem;
+  }
+  .reader-toolbar[hidden] { display: none; }
+  .reader-expanded .controls-toggle {
+    bottom: max(.5rem, env(safe-area-inset-bottom));
+    right: max(.5rem, env(safe-area-inset-right));
+    min-height: 44px;
+  }
   .reader-button {
     flex-shrink: 0;
     border: 1px solid var(--color-slate-700);
