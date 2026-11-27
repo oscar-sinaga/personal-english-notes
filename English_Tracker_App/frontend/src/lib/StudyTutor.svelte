@@ -3,6 +3,7 @@
   import { requestJson } from '../practice.js';
   import SpeechAttempt from './SpeechAttempt.svelte';
   import SpeechPlayback from './SpeechPlayback.svelte';
+  import VoicePrompt from './VoicePrompt.svelte';
 
   export let initialMode = 'speaking';
   export let aiEnabled = false;
@@ -43,7 +44,6 @@
   let busy = '';
   let error = '';
   let status = '';
-  let copiedPrompt = '';
 
   $: listening = lesson?.mode === 'listening';
   $: hasFirst = hasTake(takes[0]);
@@ -103,7 +103,6 @@
     showTranscript = false;
     saved = false;
     pendingId = undefined;
-    copiedPrompt = '';
   }
 
   function switchMode(event) {
@@ -227,29 +226,6 @@
       busy = '';
     }
   }
-
-  async function copyVoicePrompt() {
-    const source = lesson?.source ?? (reading && excerpt.trim()
-      ? { book: sourceBook, page: sourcePage, excerpt: excerpt.trim() } : null);
-    const reference = source ? source.book + (source.page ? ', PDF page ' + source.page : '') : '';
-    const evidence = source?.excerpt || lesson?.script || '';
-    const prompt = [
-      'Act as my spoken English and credit risk tutor at B1/B2 level.',
-      'Ask me one question in English, then wait for my spoken answer. Give one correction to my reasoning and one improvement to my English, then let me try again.',
-      'Use the excerpt as evidence if provided. Cite only its supplied page.',
-      'Topic: ' + (lessonTitle || topicLabel || topicId),
-      reference,
-      evidence && 'Practice context:\n' + evidence,
-      lesson?.question && 'First question: ' + lesson.question,
-    ].filter(Boolean).join('\n\n');
-    try {
-      await navigator.clipboard.writeText(prompt);
-      status = 'Copied. Paste it into a task in the ChatGPT desktop app, then select Start voice chat.';
-    } catch {
-      copiedPrompt = prompt;
-      status = 'Copy the prompt below into a task in the ChatGPT desktop app, then select Start voice chat.';
-    }
-  }
 </script>
 
 <section class="space-y-4 rounded-xl border border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-100" aria-label={reading ? 'Book tutor' : 'Guided practice'}>
@@ -302,15 +278,13 @@
         disabled={mode === 'case' ? !cases.length : !aiEnabled || (reading && (!sourcePage || excerpt.trim().length < 10))}>
         {busy === 'lesson' ? 'Preparing…' : reading ? 'Explain excerpt' : mode === 'case' ? 'Open case' : 'Generate exercise'}
       </button>
-      <button type="button" class={button} on:click={copyVoicePrompt}>Copy prompt for Codex Voice</button>
+      {#key lesson || mode}
+        <VoicePrompt topic={lessonTitle || topicLabel || topicId} {lesson} attempts={takes}
+          draftSource={reading ? { book: sourceBook, page: sourcePage, excerpt } : undefined} />
+      {/key}
     </div>
     {#if !aiEnabled && mode !== 'case'}
       <p class="text-xs text-slate-400">Choose Codex or Claude in the English AI Assistant settings to generate a lesson.</p>
-    {/if}
-    {#if copiedPrompt}
-      <label class="grid gap-1 text-xs text-slate-300">Voice practice prompt
-        <textarea readonly value={copiedPrompt} class={input} rows="4"></textarea>
-      </label>
     {/if}
   </fieldset>
 

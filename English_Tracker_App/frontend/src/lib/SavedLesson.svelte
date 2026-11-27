@@ -1,6 +1,7 @@
 <script>
   import { apiUrl } from '../practice.js';
   import SpeechPlayback from './SpeechPlayback.svelte';
+  import VoicePrompt from './VoicePrompt.svelte';
 
   export let entryId;
   export let data;
@@ -54,4 +55,7 @@
       {/if}
     </article>
   {/each}
+  {#if !previous}
+    <VoicePrompt topic={data.topic_id} lesson={data.lesson} attempts={data.attempts} />
+  {/if}
 </div>

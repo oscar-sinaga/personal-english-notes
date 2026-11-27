@@ -40,7 +40,12 @@ async function openPage({ mobile = false } = {}) {
     });
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
-      value: { async writeText(text) { window.__clipboard = text; } },
+      value: {
+        async writeText(text) {
+          if (window.__denyCopy) throw new DOMException("Clipboard permission denied", "NotAllowedError");
+          window.__clipboard = text;
+        },
+      },
     });
     if (mobile && navigator.mediaDevices) {
       navigator.mediaDevices.getUserMedia = async () => {
@@ -98,7 +103,7 @@ try {
   await reading.getByLabel("PDF page").fill("14");
   await reading.getByLabel("Book excerpt").fill("This is a synthetic passage about the probability of default.");
   await button(reading, "Copy prompt for Codex Voice").click();
-  assert.match(await page.evaluate(() => window.__clipboard), /anderson, PDF page 14/);
+  assert.match(await page.evaluate(() => window.__clipboard), /Anderson, PDF page 14/);
   assert.match(await page.evaluate(() => window.__clipboard), /synthetic passage/);
   await button(reading, "Explain excerpt").click();
   await reading.getByText("Anderson · PDF page 14").waitFor();
@@ -106,8 +111,19 @@ try {
   await reading.getByLabel("Answer or transcript", { exact: true }).fill("PD means the probability of default.");
   await button(reading, "Get tutor feedback").click();
   await reading.getByText("You identified the main risk concept.").waitFor();
+  await button(reading, "Copy prompt for Codex Voice").click();
+  const readingPrompt = await page.evaluate(() => window.__clipboard);
+  assert.match(readingPrompt, /Anderson, PDF page 14/);
+  assert.match(readingPrompt, /Practice question:/);
+  assert.match(readingPrompt, /My answer \(attempt 1\):\nPD means the probability of default\./);
+  assert.match(readingPrompt, /Earlier concept or comprehension feedback:\nYou identified the main risk concept/);
+  assert.match(readingPrompt, /Earlier English feedback:\nTry a complete sentence/);
   await reading.getByLabel("Answer or transcript", { exact: true }).fill("PD is the chance of default.");
   await reading.getByText("You identified the main risk concept.").waitFor({ state: "hidden" });
+  await button(reading, "Copy prompt for Codex Voice").click();
+  const editedPrompt = await page.evaluate(() => window.__clipboard);
+  assert.match(editedPrompt, /My answer \(attempt 1\):\nPD is the chance of default\./);
+  assert.doesNotMatch(editedPrompt, /PD means the probability of default|Earlier English feedback/);
   await button(reading, "Get tutor feedback").click();
   await reading.getByText("You identified the main risk concept.").waitFor();
   await button(reading, "Save to Practice Journal").click();
@@ -140,6 +156,7 @@ try {
   await button(first, "Try again").click();
   const second = guide.locator("h5", { hasText: /^Attempt 2$/ }).locator("..");
   await record(page, second);
+  await second.getByLabel("Second answer or transcript").fill("The analyst checked the portfolio afterward.");
   await button(guide, "Save to Practice Journal").click();
   await guide.getByText(/Saved to Practice Journal/).waitFor();
 
@@ -155,6 +172,14 @@ try {
     assert.equal(result.status(), 206);
     assert.equal((await result.body()).toString("hex"), "1a45dfa3");
   }
+  await page.evaluate(() => window.__denyCopy = true);
+  await button(journal, "Copy prompt for Codex Voice").click();
+  const journalPrompt = await journal.getByLabel("Voice practice prompt").inputValue();
+  assert.match(journalPrompt, /My answer \(attempt 1\):\nThe credit team reviewed the default rate\./);
+  assert.match(journalPrompt, /My answer \(attempt 2\):\nThe analyst checked the portfolio afterward\./);
+  assert.match(journalPrompt, /Earlier English feedback/);
+  assert.doesNotMatch(journalPrompt, /\/audio\//);
+  await page.evaluate(() => window.__denyCopy = false);
   await button(journal, "Back to journal").click();
   await button(listeningEntry, "Review now").click();
   assert.equal(await journal.locator("audio").count(), 0);

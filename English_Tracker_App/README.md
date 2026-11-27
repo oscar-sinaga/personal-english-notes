@@ -73,9 +73,11 @@ Gemini remains unavailable until an official Google CLI connection is set up.
 - Open **Study details** in Practice Journal to replay both takes, or **Review
   now** to recall the answer before revealing earlier feedback. Reviews are
   scheduled in WIB.
-- **Copy prompt for Codex Voice** prepares the current exercise for a task
-  in the ChatGPT desktop app. Paste the prompt there and select **Start voice
-  chat** when available.
+- **Copy prompt for Codex Voice** copies the current exercise or an exercise
+  opened in **Study details**. It includes the excerpt and its book and page
+  when provided, the practice question, and the written attempts with their
+  feedback. Paste it into a task in the ChatGPT desktop app and select **Start
+  voice chat** when available.
 
 Run the API regression suite against a disposable database in the built image:
 
