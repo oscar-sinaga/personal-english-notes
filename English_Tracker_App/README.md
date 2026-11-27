@@ -59,9 +59,11 @@ Gemini remains unavailable until an official Google CLI connection is set up.
 
 ### Guided practice
 
-- **Reading notes → Ask about this excerpt** takes a pasted passage, book,
-  and PDF page reference. Explain it back in English and save the exercise to
-  Practice Journal.
+- In **Read Book**, open **Study reader** if the browser PDF viewer is active.
+  Highlight a passage and choose **Ask tutor** to fill in its book, PDF page
+  and excerpt. **Page text** lets you select the passage with the keyboard.
+  You can also paste a passage in Reading notes. Select **Explain excerpt** to
+  send it to the tutor, then save the exercise to Practice Journal.
 - Choose **Speaking**, **Listening**, or **Credit Risk** in Practice Editor
   for voice exercises, shadowing, role-play and Case Lab. Listening reveals
   the passage after an attempt and supports slower replay by sentence.
@@ -89,4 +91,5 @@ docker run --rm --network none -e PYTHONPATH=/app \
 The browser fixture `tests/serve_guided_fixture.py` serves temporary content
 on loopback. Run `tests/browser-guided.mjs` with Playwright 1.65.0 and Chromium
 in the same network namespace. It uses a synthetic microphone stream and
-simulates device voice and dictation availability.
+simulates device voice and dictation availability. `tests/browser-pdf-tutor.mjs`
+checks PDF selection, keyboard controls and the resulting excerpt draft.

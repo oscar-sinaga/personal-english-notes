@@ -1,4 +1,4 @@
-"""Isolated deterministic provider and a one-page book for browser tests."""
+"""Isolated deterministic provider and small books for browser tests."""
 
 import json
 import os
@@ -8,16 +8,31 @@ from tempfile import TemporaryDirectory
 from fpdf import FPDF
 import uvicorn
 
+
+def write_book(path, pages):
+    pdf = FPDF()
+    pdf.set_font("Helvetica", size=12)
+    for lines in pages:
+        pdf.add_page()
+        for line in lines:
+            pdf.cell(text=line, new_x="LMARGIN", new_y="NEXT")
+    pdf.output(path)
+
+
 with TemporaryDirectory(prefix="guided-browser-") as directory:
     os.environ["TRACKER_STATE_DIR"] = directory
     os.environ["TRACKER_ONLINE_HELPERS"] = "0"
-    book = Path(directory) / "fictional.pdf"
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Helvetica", size=12)
-    pdf.cell(text="Synthetic book fixture: PD is the probability of default.")
-    pdf.output(book)
-    os.environ["TRACKER_BOOK_PATH"] = str(book)
+    directory = Path(directory)
+    anderson = directory / "anderson.pdf"
+    siddiqi = directory / "siddiqi.pdf"
+    write_book(anderson, [
+        ["Synthetic book fixture: PD is the probability of default."],
+        ["Expected loss depends on PD, LGD, and EAD.", "A separate paragraph explains the inputs."],
+        [],
+    ])
+    write_book(siddiqi, [["A score ranks applicants by their estimated risk."]])
+    os.environ["TRACKER_BOOK_PATH"] = str(anderson)
+    os.environ["TRACKER_SCORECARD_PATH"] = str(siddiqi)
 
     import subscription
     from server import app

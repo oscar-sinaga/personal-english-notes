@@ -100,20 +100,25 @@
   let currentBook = 'anderson';
   let bookPages = { anderson: 1, siddiqi: 1 };
   let readerExpanded = false;
+  let nativePdfAvailable = false;
   let useBrowserPdf = false;
+  let studyReader;
+  let notesButton;
   let showReadingHeader = false;
   let browserFullscreenAvailable = false;
   let browserPdf;
   let browserPdfStatus = '';
-  $: desktopReading = appMode === 'reading' && useBrowserPdf;
-  $: headerVisible = desktopReading ? showReadingHeader : showHeader;
-  $: hideReadingOverlay = readerExpanded || desktopReading;
+  $: compactReading = appMode === 'reading' && nativePdfAvailable;
+  $: desktopReading = compactReading && useBrowserPdf;
+  $: headerVisible = compactReading ? showReadingHeader : showHeader;
+  $: hideReadingOverlay = readerExpanded || desktopReading || (appMode === 'reading' && showCompanion);
   $: selectedBook = books?.[currentBook] ? currentBook : Object.keys(bookTitles).find(book => books?.[book]);
 
   $: pdfUrl = selectedBook ? `${API_URL}/pdf?book=${selectedBook}` : '';
 
   // Reading Mode Layout State
-  let companionWidth = 320;
+  let companionWidth = 384;
+  let readingLayout;
   let isResizingCompanion = false;
   let showGrammarModal = false;
   let showDictionaryModal = false;
@@ -123,6 +128,7 @@
   let interactionsFilter = "All"; // 'All', 'Chatbot', 'Grammar', 'Explain'
   let isFetchingInteractions = false;
   let showCompanion = false;
+  let companionOpened = false;
   let showHeader = true;
   let doubtContent = "";
   let doubtImageBase64 = null;
@@ -138,8 +144,12 @@
 
 
   onMount(() => {
-    useBrowserPdf = navigator.pdfViewerEnabled &&
+    nativePdfAvailable = navigator.pdfViewerEnabled &&
       window.matchMedia('(any-hover: hover) and (any-pointer: fine)').matches;
+    useBrowserPdf = nativePdfAvailable;
+    try {
+      if (localStorage.getItem('english-notes.pdf-reader') === 'study') useBrowserPdf = false;
+    } catch { /* Keep the current reader when storage is unavailable. */ }
     browserFullscreenAvailable = document.fullscreenEnabled && !!Element.prototype.requestFullscreen;
     if (syllabusData.length > 0) {
       expandedBlocks[syllabusData[0].id] = true;
@@ -162,7 +172,10 @@
       }
     };
     window.addEventListener('beforeunload', warnUnsaved);
-    return () => window.removeEventListener('beforeunload', warnUnsaved);
+    return () => {
+      window.removeEventListener('beforeunload', warnUnsaved);
+      stopResizeCompanion();
+    };
   });
 
   async function showBrowserPdfFullscreen() {
@@ -172,6 +185,14 @@
     } catch {
       browserPdfStatus = 'Open the PDF in its own tab to use your browser’s full screen.';
     }
+  }
+
+  function switchPdfReader() {
+    useBrowserPdf = !useBrowserPdf;
+    browserPdfStatus = '';
+    try {
+      localStorage.setItem('english-notes.pdf-reader', useBrowserPdf ? 'browser' : 'study');
+    } catch { /* The new reader is still available for this tab. */ }
   }
 
   async function fetchProgress() {
@@ -308,19 +329,30 @@
   }
 
   // --- Resize Handlers (Companion) ---
-  function startResizeCompanion(e) {
+  function startResizeCompanion(event) {
+    if (event.button !== 0) return;
+    event.preventDefault();
     isResizingCompanion = true;
     document.addEventListener('mousemove', handleResizeCompanion);
     document.addEventListener('mouseup', stopResizeCompanion);
   }
   function handleResizeCompanion(e) {
-    if (isResizingCompanion) {
-      // 24px is the right padding of <main>
-      let newWidth = window.innerWidth - e.clientX - 24;
-      if (newWidth < 250) newWidth = 250;
-      if (newWidth > 800) newWidth = 800;
-      companionWidth = newWidth;
+    if (isResizingCompanion && readingLayout) {
+      setCompanionWidth(readingLayout.getBoundingClientRect().right - e.clientX);
     }
+  }
+  function setCompanionWidth(value) {
+    companionWidth = Math.round(Math.min(800, window.innerWidth * .52, Math.max(280, value)));
+  }
+  function resizeCompanionWithKeys(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      setReadingNotes(false);
+      return;
+    }
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    setCompanionWidth(companionWidth + (event.key === 'ArrowLeft' ? 24 : -24));
   }
   function stopResizeCompanion() {
     isResizingCompanion = false;
@@ -451,9 +483,28 @@
     appMode = mode;
   }
 
-  function setReadingNotes(open) {
-    if (!open && readingTutor?.canLeave() === false) return;
+  async function setReadingNotes(open) {
+    if (!open && readingTutor?.canReturnToPdf() === false) return;
+    if (open) companionOpened = true;
     showCompanion = open;
+    await tick();
+    if (open) readingTutor?.focusExcerpt();
+    else notesButton?.focus();
+  }
+
+  async function askAboutPdf(quote) {
+    const source = { ...quote, book: selectedBook };
+    const existingTutor = readingTutor;
+    if (existingTutor?.useExcerpt(source) === false) return false;
+    await studyReader?.leaveFullscreenForTutor();
+    companionOpened = true;
+    showCompanion = true;
+    await tick();
+    if (!readingTutor) return false;
+    if (!existingTutor) readingTutor.useExcerpt(source);
+    await tick();
+    readingTutor.focusExcerpt(true);
+    return true;
   }
 
   function changeSkill(skill) {
@@ -870,8 +921,8 @@
 
 <main class="min-h-dvh bg-slate-950 font-sans text-slate-100 p-3 lg:h-dvh lg:p-6 flex flex-col"
   style:cursor={isResizingCompanion ? 'col-resize' : undefined}
-  style:height={desktopReading ? '100dvh' : undefined}
-  style:padding={desktopReading ? '0.5rem' : undefined}>
+  style:height={compactReading ? '100dvh' : undefined}
+  style:padding={compactReading ? '0.5rem' : undefined}>
   
   <!-- Interactions Modal -->
   {#if showInteractionsModal}
@@ -962,10 +1013,12 @@
       
       <!-- Mode Switcher Buttons -->
       <div class="flex flex-wrap border border-slate-700 rounded-lg p-1 bg-slate-950">
-        <button class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'dashboard' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => changeAppMode('dashboard')}>
+        <button aria-current={appMode === 'dashboard' ? 'page' : undefined}
+          class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'dashboard' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => changeAppMode('dashboard')}>
           Dashboard
         </button>
-        <button class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'reading' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => changeAppMode('reading')}>
+        <button aria-current={appMode === 'reading' ? 'page' : undefined}
+          class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'reading' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => changeAppMode('reading')}>
           Read Book
         </button>
         <button class="rounded-md px-2 py-2 text-xs font-bold text-teal-300 sm:px-4 hover:bg-slate-800" on:click={() => showPracticeJournal = true}>
@@ -996,7 +1049,7 @@
       </div>
 
       <!-- Progress & Analytics -->
-      <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <div class="{appMode === 'reading' ? 'hidden sm:flex' : 'flex'} flex-wrap items-center gap-x-3 gap-y-2">
         <!-- Focus Analytics -->
         <div class="border-l border-slate-800 pl-3">
           <div class="text-xs text-slate-400 mb-1">FOCUS HOURS</div>
@@ -1019,14 +1072,14 @@
 
       <!-- Hide Header Button -->
       <button class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer" on:click={() => {
-        if (desktopReading) showReadingHeader = false;
+        if (compactReading) showReadingHeader = false;
         else showHeader = false;
       }} title="Hide Top Navigation">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
       </button>
     </div>
   </header>
-  {:else if !desktopReading}
+  {:else if !compactReading}
   <!-- Floating Show Header Button -->
   <button inert={readerExpanded} class="fixed top-0 left-1/2 -translate-x-1/2 z-50 bg-slate-800 hover:bg-teal-600 text-slate-400 hover:text-slate-950 px-6 py-1 rounded-b-xl shadow-lg border-b border-x border-slate-700 hover:border-teal-500 transition-all cursor-pointer group flex flex-col items-center justify-center gap-0.5" on:click={() => showHeader = true} title="Show Top Navigation">
     <span class="text-[9px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto overflow-hidden">Show Navbar</span>
@@ -1388,32 +1441,43 @@
   <div class="flex flex-1 min-h-0 lg:overflow-hidden relative z-10 w-full" style:z-index={readerExpanded ? 60 : undefined}>
     <!-- Reading Mode Layout -->
     {#if appMode === 'reading'}
-    <div class="flex-1 min-h-0 flex gap-4 pb-4 w-full"
+    <div class="flex-1 min-h-0 flex gap-2 pb-4 w-full" bind:this={readingLayout}
       style:pointer-events={isResizingCompanion ? 'none' : undefined}
-      style:padding-bottom={desktopReading ? 0 : undefined}>
+      style:padding-bottom={compactReading ? 0 : undefined}>
       
       <!-- PDF Viewer Area -->
-      <section class="flex min-w-0 flex-1 flex-col relative lg:h-full lg:overflow-hidden">
+      <section class="min-w-0 flex-1 flex-col relative lg:h-full lg:overflow-hidden {showCompanion ? 'hidden lg:flex' : 'flex'}">
         
-        <div class="mb-3 flex shrink-0 flex-wrap items-center gap-2" style:margin-bottom={desktopReading ? '0.5rem' : undefined} inert={readerExpanded}>
-          {#each Object.entries(bookTitles) as [book, title]}
-            {#if books?.[book]}
-              <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-300 aria-pressed:bg-teal-950"
-                aria-pressed={selectedBook === book} on:click={() => {
-                  currentBook = book;
-                  browserPdfStatus = '';
-                }}>{title} PDF</button>
-            {/if}
-          {/each}
-          <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-amber-200"
-            aria-expanded={showCompanion} aria-controls={showCompanion ? 'reading-companion' : undefined} on:click={() => setReadingNotes(!showCompanion)}>
+        <div class="mb-2 flex shrink-0 flex-wrap items-center gap-2" inert={readerExpanded}>
+          {#if selectedBook}
+          <div class="flex flex-wrap gap-1 rounded-lg border border-slate-800 p-0.5" role="group" aria-label="Credit risk books">
+            {#each Object.entries(bookTitles) as [book, title]}
+              {#if books?.[book]}
+                <button type="button" class="min-h-11 rounded-md px-3 py-2 text-sm text-slate-200 aria-pressed:bg-teal-950 aria-pressed:font-semibold aria-pressed:text-teal-200"
+                  aria-pressed={selectedBook === book} on:click={() => {
+                    currentBook = book;
+                    browserPdfStatus = '';
+                  }}>{title} PDF</button>
+              {/if}
+            {/each}
+          </div>
+          {/if}
+          {#if selectedBook && nativePdfAvailable}
+            <button type="button" class="min-h-11 rounded-lg border px-3 py-2 text-sm {desktopReading
+              ? 'border-teal-500 bg-teal-400 font-semibold text-slate-950 hover:bg-teal-300'
+              : 'border-slate-700 text-slate-200 hover:bg-slate-800'}"
+              on:click={switchPdfReader}>{desktopReading ? 'Study reader' : 'Browser PDF'}</button>
+          {/if}
+          <button type="button" class="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-200 hover:bg-slate-800"
+            bind:this={notesButton} aria-expanded={showCompanion} aria-controls={showCompanion ? 'reading-companion' : undefined}
+            on:click={() => setReadingNotes(!showCompanion)}>
             {showCompanion ? 'Hide reading notes' : 'Reading notes'}
           </button>
-          {#if desktopReading}
+          {#if compactReading}
             {#if selectedBook}
               <a class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-300"
-                href={pdfUrl} target="_blank" rel="noopener">Open PDF tab</a>
-              {#if browserFullscreenAvailable}
+                href={pdfUrl + '#page=' + bookPages[selectedBook]} target="_blank" rel="noopener">Open PDF tab</a>
+              {#if desktopReading && browserFullscreenAvailable}
                 <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm"
                   on:click={showBrowserPdfFullscreen}>Full screen</button>
               {/if}
@@ -1431,11 +1495,12 @@
         {#if selectedBook}
           {#key selectedBook}
             {#if desktopReading}
-              <iframe bind:this={browserPdf} src={pdfUrl} title={bookTitles[selectedBook] + ' PDF'}
+              <iframe bind:this={browserPdf} src={pdfUrl + '#page=' + bookPages[selectedBook]} title={bookTitles[selectedBook] + ' PDF'}
                 class="min-h-0 w-full flex-1 rounded-lg border border-slate-800 bg-slate-900" allowfullscreen></iframe>
             {:else}
-              <BookReader url={pdfUrl} title={bookTitles[selectedBook]}
-                filename={selectedBook + '.pdf'} bind:page={bookPages[selectedBook]} bind:expanded={readerExpanded} />
+              <BookReader url={pdfUrl} title={bookTitles[selectedBook]} bind:this={studyReader}
+                filename={selectedBook + '.pdf'} bind:page={bookPages[selectedBook]} bind:expanded={readerExpanded}
+                onExcerpt={askAboutPdf} />
             {/if}
           {/key}
         {:else}
@@ -1446,21 +1511,28 @@
       </section>
 
     <!-- Reading Companion Sidebar -->
-    {#if showCompanion}
+    {#if companionOpened}
       <!-- Resizer Handle for Companion -->
-      <div class="hidden w-4 shrink-0 lg:flex items-center justify-center cursor-col-resize group z-10 mx-1" on:mousedown={startResizeCompanion} title="Drag to resize">
-        <div class="w-1 h-12 bg-slate-700 rounded-full group-hover:bg-amber-500 transition-colors duration-300"></div>
+      {#if showCompanion}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions (WAI-ARIA focusable window splitter.) -->
+      <div class="group z-10 hidden w-4 shrink-0 cursor-col-resize items-center justify-center rounded focus-visible:outline-2 focus-visible:outline-teal-300 lg:flex"
+        role="separator" tabindex="0" aria-label="Reading notes width" aria-orientation="vertical" aria-controls="reading-companion"
+        aria-valuemin="280" aria-valuemax="800" aria-valuenow={companionWidth}
+        on:mousedown={startResizeCompanion} on:keydown={resizeCompanionWithKeys}>
+        <div class="h-12 w-1 rounded-full bg-slate-600 group-hover:bg-teal-400 group-focus-visible:bg-teal-400"></div>
       </div>
+      {/if}
 
-      <section id="reading-companion" aria-labelledby="companion-title" inert={readerExpanded}
-        class="fixed inset-x-0 bottom-0 z-30 flex max-h-[45dvh] shrink-0 flex-col overflow-hidden rounded-t-xl border border-slate-700 bg-slate-900 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl lg:static lg:h-full lg:max-h-none lg:w-(--companion-width) lg:rounded-xl"
+      <section id="reading-companion" aria-labelledby="companion-title" inert={readerExpanded || !showCompanion}
+        class="max-h-[82dvh] min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900 p-3 shadow-xl lg:h-full lg:max-h-none lg:max-w-[52vw] lg:w-(--companion-width) lg:flex-none lg:p-4 {showCompanion ? 'flex' : 'hidden'}"
         style:--companion-width="{companionWidth}px">
         <div class="mb-3 flex shrink-0 items-center justify-between gap-2 border-b border-slate-800 pb-2">
-          <h2 id="companion-title" class="text-sm font-semibold text-slate-200">Reading Companion</h2>
-          <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm" on:click={() => setReadingNotes(false)}>Close notes</button>
+          <h2 id="companion-title" class="text-base font-semibold text-slate-100">Reading Companion</h2>
+          <button type="button" class="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
+            on:click={() => setReadingNotes(false)}><span class="lg:hidden">Back to PDF</span><span class="hidden lg:inline">Close notes</span></button>
         </div>
         
-        <div class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+        <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto custom-scrollbar">
           <StudyTutor bind:this={readingTutor} initialMode="excerpt" aiEnabled={subscriptionAI}
             topicId={selectedTopic || 'General'} topicLabel={topicNames[selectedTopic] || selectedTopic || 'Credit risk'}
             book={selectedBook || 'anderson'} page={desktopReading ? null : bookPages[selectedBook]} />
@@ -1648,9 +1720,10 @@
   <!-- ============================================== -->
 
   <div class="fixed bottom-6 right-6 z-[100] cursor-grab active:cursor-grabbing" use:draggable
-    inert={hideReadingOverlay} style:visibility={hideReadingOverlay ? 'hidden' : undefined}>
+    hidden={hideReadingOverlay} inert={hideReadingOverlay}>
     <button 
       class="bg-gradient-to-r from-teal-500 to-sky-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:shadow-[0_0_25px_rgba(20,184,166,0.6)] hover:scale-105 transition-all cursor-pointer border-2 border-slate-900 group flex items-center gap-2"
+      aria-label="English AI Assistant" aria-expanded={isChatOpen}
       on:click={() => { isChatOpen = !isChatOpen; if(isChatOpen) scrollToBottom(); }}
     >
       <span class="text-white/60 mr-1">⠿</span>
@@ -1662,7 +1735,7 @@
   </div>
 
   {#if isChatOpen}
-    <div inert={hideReadingOverlay} style:visibility={hideReadingOverlay ? 'hidden' : undefined} class="fixed {isChatMaximized ? 'inset-4 md:inset-10 z-[200] w-auto h-auto' : 'bottom-24 right-6 z-[100] w-80 md:w-96'} bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300" style="{isChatMaximized ? '' : 'height: 500px; max-height: calc(100vh - 120px);'}">
+    <div hidden={hideReadingOverlay} inert={hideReadingOverlay} class="fixed {isChatMaximized ? 'inset-4 md:inset-10 z-[200] w-auto h-auto' : 'bottom-24 right-6 z-[100] w-80 md:w-96'} bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300" style="{isChatMaximized ? '' : 'height: 500px; max-height: calc(100vh - 120px);'}">
       <!-- Header -->
       <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-4 border-b border-slate-700 flex justify-between items-center shrink-0">
         <div class="flex items-center gap-2">

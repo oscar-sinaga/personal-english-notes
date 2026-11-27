@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { requestJson } from '../practice.js';
+  import { MAX_BOOK_EXCERPT, MIN_BOOK_EXCERPT, requestJson } from '../practice.js';
   import SpeechAttempt from './SpeechAttempt.svelte';
   import SpeechPlayback from './SpeechPlayback.svelte';
   import VoicePrompt from './VoicePrompt.svelte';
@@ -44,6 +44,8 @@
   let busy = '';
   let error = '';
   let status = '';
+  let titleElement;
+  let explainButton;
 
   $: listening = lesson?.mode === 'listening';
   $: hasFirst = hasTake(takes[0]);
@@ -75,6 +77,31 @@
     return !dirty || window.confirm('Discard this unsaved guided practice?');
   }
 
+  export function canReturnToPdf() {
+    if (!busy && !recording) return true;
+    status = recording ? 'Stop the recording before going back to the PDF.'
+      : 'Wait for the current tutor request to finish.';
+    return false;
+  }
+
+  export function useExcerpt(source) {
+    if (!reading) return false;
+    if (source.book === sourceBook && source.page === sourcePage && source.excerpt === excerpt) return true;
+    if (!canLeave()) return false;
+    reset();
+    sourceBook = source.book;
+    sourcePage = source.page;
+    excerpt = source.excerpt;
+    error = '';
+    status = 'Excerpt added from the PDF.';
+    return true;
+  }
+
+  export function focusExcerpt(readyToExplain = false) {
+    const target = readyToExplain && explainButton && !explainButton.disabled ? explainButton : titleElement;
+    target?.focus();
+  }
+
   function post(path, json) {
     return requestJson('/tutor/' + path, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(json),
@@ -97,6 +124,8 @@
   function reset() {
     lesson = undefined;
     summary = undefined;
+    lessonTopic = '';
+    lessonTitle = '';
     caseNotes = '';
     takes = [empty(), empty()];
     retry = false;
@@ -230,7 +259,7 @@
 
 <section class="space-y-4 rounded-xl border border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-100" aria-label={reading ? 'Book tutor' : 'Guided practice'}>
   <div class="flex flex-wrap items-center justify-between gap-1">
-    <h3 class="font-semibold">{reading ? 'Ask about this excerpt' : modes[mode]}</h3>
+    <h3 class="font-semibold" tabindex="-1" bind:this={titleElement}>{reading ? 'Ask about this excerpt' : modes[mode]}</h3>
     {#if !reading && lesson}
       <span class="text-xs text-slate-400">{lessonTitle}</span>
     {/if}
@@ -239,15 +268,17 @@
   <fieldset disabled={Boolean(busy) || recording} class="space-y-3">
     {#if reading}
       <div class="grid grid-cols-2 gap-2">
-        <label class="grid gap-1 text-xs text-slate-300">Book
-          <select bind:value={sourceBook} class={input}><option value="anderson">Anderson</option><option value="siddiqi">Siddiqi</option></select>
-        </label>
-        <label class="grid gap-1 text-xs text-slate-300">PDF page
+        <div class="grid gap-1 text-sm text-slate-300">
+          <label for="excerpt-source-book">Book</label>
+          <select id="excerpt-source-book" bind:value={sourceBook} class={input}><option value="anderson">Anderson</option><option value="siddiqi">Siddiqi</option></select>
+        </div>
+        <label class="grid gap-1 text-sm text-slate-300">PDF page
           <input bind:value={sourcePage} type="number" min="1" max="10000" step="1" class={input} inputmode="numeric" />
         </label>
       </div>
-      <label class="grid gap-1 text-xs text-slate-300">Book excerpt
-        <textarea bind:value={excerpt} maxlength="4000" rows="4" class={input} placeholder="Paste the passage you want to discuss."></textarea>
+      <label class="grid gap-1 text-sm text-slate-300">Book excerpt
+        <textarea bind:value={excerpt} maxlength={MAX_BOOK_EXCERPT} rows="4" class={input}
+          placeholder="Select text in the study reader or paste an excerpt."></textarea>
       </label>
     {:else}
       <label class="grid max-w-sm gap-1 text-xs text-slate-300">Exercise mode
@@ -274,8 +305,9 @@
       {/if}
     {/if}
     <div class="flex flex-wrap gap-2">
-      <button type="button" class={accent} on:click={start}
-        disabled={mode === 'case' ? !cases.length : !aiEnabled || (reading && (!sourcePage || excerpt.trim().length < 10))}>
+      <button type="button" class={reading ? accent + ' min-h-11 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300' : accent}
+        bind:this={explainButton} on:click={start}
+        disabled={mode === 'case' ? !cases.length : !aiEnabled || (reading && (!sourcePage || excerpt.trim().length < MIN_BOOK_EXCERPT))}>
         {busy === 'lesson' ? 'Preparing…' : reading ? 'Explain excerpt' : mode === 'case' ? 'Open case' : 'Generate exercise'}
       </button>
       {#key lesson || mode}
@@ -293,7 +325,7 @@
       <p class="rounded-md bg-slate-800 px-2 py-1 text-xs text-teal-200">{lesson.source.book === 'anderson' ? 'Anderson' : 'Siddiqi'} · PDF page {lesson.source.page}</p>
     {/if}
     {#if summary}
-      <dl class="grid gap-2 text-xs leading-relaxed">
+      <dl class="grid gap-2 text-sm leading-relaxed">
         <div><dt class="font-semibold text-teal-300">Konsep</dt><dd class="whitespace-pre-wrap break-words">{summary.concept}</dd></div>
         <div><dt class="font-semibold text-teal-300">Simple English</dt><dd class="whitespace-pre-wrap break-words">{summary.simple_english}</dd></div>
         <div><dt class="font-semibold text-teal-300">Useful phrases</dt><dd class="whitespace-pre-wrap break-words">{summary.phrases}</dd></div>

@@ -2,6 +2,8 @@ export const apiUrl = import.meta.env.BASE_URL + 'api';
 export const skills = ['Writing', 'Speaking', 'Reading', 'Listening', 'Credit Risk'];
 export const contexts = ['Study', 'Work', 'Personal'];
 export const statuses = { draft: 'Draft', completed: 'Completed' };
+export const MIN_BOOK_EXCERPT = 10;
+export const MAX_BOOK_EXCERPT = 4000;
 
 export async function requestJson(path, options) {
   const response = await fetch(apiUrl + path, options);
