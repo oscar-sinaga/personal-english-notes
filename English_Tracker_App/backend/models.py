@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Text
+from sqlalchemy import JSON, Boolean, Column, ForeignKey, Integer, LargeBinary, String, Text
 from pydantic import BaseModel
 from database import Base
 
@@ -81,3 +81,24 @@ class PracticeEntry(Base):
     updated_at = Column(String, nullable=False, index=True)
     version = Column(Integer, nullable=False)
 
+
+
+class TutorPractice(Base):
+    __tablename__ = "tutor_practices"
+
+    entry_id = Column(String(36), ForeignKey("practice_entries.id"), primary_key=True)
+    lesson = Column(JSON, nullable=False)
+    audio_hashes = Column(JSON, nullable=False)
+    due_at = Column(String, nullable=False, index=True)
+    review_version = Column(Integer, nullable=False, default=1)
+    streak = Column(Integer, nullable=False, default=0)
+    last_recall = Column(Text, nullable=False, default="")
+
+
+class TutorRecording(Base):
+    __tablename__ = "tutor_recordings"
+
+    entry_id = Column(String(36), ForeignKey("tutor_practices.entry_id"), primary_key=True)
+    attempt = Column(Integer, primary_key=True)
+    media_type = Column(String(24), nullable=False)
+    audio = Column(LargeBinary, nullable=False)

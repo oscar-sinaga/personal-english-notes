@@ -12,7 +12,7 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session
 
 from database import SessionLocal, get_db
-from models import PracticeEntry, StudySession
+from models import PracticeEntry, StudySession, TutorPractice
 
 
 router = APIRouter(prefix="/api")
@@ -89,15 +89,27 @@ def list_practice(
     db: Annotated[Session, Depends(get_db)],
 ):
     entries = db.scalars(filtered_entries(filters).offset(filters.offset).limit(51)).all()
+    page = entries[:50]
+    guided = set(db.scalars(
+        select(TutorPractice.entry_id).where(TutorPractice.entry_id.in_([row.id for row in page]))
+    )) if page else set()
     return {
-        "items": [serialize(row) for row in entries[:50]],
+        "items": [{**serialize(row), "guided": row.id in guided} for row in page],
         "next_offset": filters.offset + 50 if len(entries) > 50 else None,
     }
 
 
 @router.put("/practice/{entry_id}")
 def save_practice(entry_id: UUID, data: PracticeInput, db: Annotated[Session, Depends(get_db)]):
-    entry_id = str(entry_id)
+    key = str(entry_id)
+    if db.get(TutorPractice, key) is not None:
+        raise HTTPException(409, "Open Study details to view this saved tutor exercise.")
+    entry = write_practice(key, data, db)
+    db.commit()
+    return entry
+
+
+def write_practice(entry_id: str, data: PracticeInput, db: Session):
     values = data.model_dump(exclude={"version"})
     if data.session_id is not None:
         session = db.get(StudySession, data.session_id)
@@ -119,9 +131,7 @@ def save_practice(entry_id: UUID, data: PracticeInput, db: Annotated[Session, De
         entry is None or any(getattr(entry, field) != value for field, value in values.items())
     ):
         raise HTTPException(409, "This entry changed in another tab. Reopen it before saving.")
-    response = serialize(entry)
-    db.commit()
-    return response
+    return serialize(entry)
 
 
 def csv_cell(value):

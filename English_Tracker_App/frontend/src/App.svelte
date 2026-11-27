@@ -9,6 +9,7 @@
   import DailyPractice from './lib/DailyPractice.svelte';
   import BookReader from './lib/BookReader.svelte';
   import PracticeJournal from './lib/PracticeJournal.svelte';
+  import StudyTutor from './lib/StudyTutor.svelte';
   import { apiUrl as API_URL, contexts, requestJson, saveEntry, skills, statuses } from './practice.js';
 
   marked.use(markedKatex({ 
@@ -74,6 +75,10 @@
   let books = null;
   let exportStatus = "";
   let practiceEditor;
+  let voiceTutor;
+  let readingTutor;
+  let guidedKey = 0;
+  const guidedModes = { Speaking: 'speaking', Listening: 'listening', 'Credit Risk': 'case' };
 
   // Lexicon state
   let vocabularies = [];
@@ -439,8 +444,31 @@
       && snapshot(data) !== savedSnapshot;
   }
 
+  function changeAppMode(mode) {
+    if (appMode === mode) return;
+    const tutor = appMode === 'reading' ? readingTutor : voiceTutor;
+    if (tutor?.canLeave() === false) return;
+    appMode = mode;
+  }
+
+  function setReadingNotes(open) {
+    if (!open && readingTutor?.canLeave() === false) return;
+    showCompanion = open;
+  }
+
+  function changeSkill(skill) {
+    if (skill === practice.skill) return true;
+    if (voiceTutor?.canLeave() === false) return false;
+    practice = { ...practice, skill };
+    guidedKey += 1;
+    return true;
+  }
+
   function openPractice(entry) {
     if (savingPractice || (hasUnsavedPractice() && !window.confirm('Discard the unsaved changes in this editor?'))) return false;
+    const tutor = appMode === 'reading' ? readingTutor : voiceTutor;
+    if (tutor?.canLeave() === false) return false;
+    guidedKey += 1;
     practice = entry
       ? Object.fromEntries(Object.keys(emptyPractice()).map(key => [key, entry[key]]))
       : emptyPractice();
@@ -934,10 +962,10 @@
       
       <!-- Mode Switcher Buttons -->
       <div class="flex flex-wrap border border-slate-700 rounded-lg p-1 bg-slate-950">
-        <button class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'dashboard' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => appMode = 'dashboard'}>
+        <button class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'dashboard' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => changeAppMode('dashboard')}>
           Dashboard
         </button>
-        <button class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'reading' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => appMode = 'reading'}>
+        <button class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'reading' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => changeAppMode('reading')}>
           Read Book
         </button>
         <button class="rounded-md px-2 py-2 text-xs font-bold text-teal-300 sm:px-4 hover:bg-slate-800" on:click={() => showPracticeJournal = true}>
@@ -1121,7 +1149,10 @@
 
       <!-- Logger Panel -->
       <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-xl flex-1 flex flex-col">
-        <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Practice Editor</h2>
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">Practice Editor</h2>
+          <button type="button" class="rounded-lg border border-teal-800 px-2 py-1 text-xs text-teal-200" on:click={() => changeSkill('Credit Risk')}>Credit Risk Case Lab</button>
+        </div>
         
         <div class="grid grid-cols-1 gap-3 mb-4 min-[420px]:grid-cols-2">
           <div class="relative flex min-w-0 flex-col gap-1.5">
@@ -1171,7 +1202,9 @@
           </div>
           <div class="flex flex-col gap-1.5">
             <label for="practice-skill" class="text-xs text-slate-400">Skill</label>
-            <select id="practice-skill" bind:value={practice.skill} class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 cursor-pointer outline-none">
+            <select id="practice-skill" value={practice.skill} on:change={event => {
+              if (!changeSkill(event.currentTarget.value)) event.currentTarget.value = practice.skill;
+            }} class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 cursor-pointer outline-none">
               {#each skills as skill}<option value={skill}>{skill}</option>{/each}
             </select>
           </div>
@@ -1189,6 +1222,14 @@
           </label>
         </div>
 
+        {#if guidedModes[practice.skill]}
+          <div class="mb-4">
+            {#key guidedKey}
+              <StudyTutor bind:this={voiceTutor} initialMode={guidedModes[practice.skill]} aiEnabled={subscriptionAI}
+                topicId={selectedTopic || 'General'} topicLabel={topicNames[selectedTopic] || selectedTopic || 'Credit risk'} context={practice.context} />
+            {/key}
+          </div>
+        {/if}
         <div class="flex flex-col gap-1.5">
           <label for="content" class="text-xs text-slate-400">Original response or transcript</label>
           <textarea id="content" bind:this={practiceEditor} bind:value={logContent} maxlength="25000" rows="5" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg p-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none" placeholder="Write your explanation or paste your speaking transcript."></textarea>
@@ -1259,6 +1300,7 @@
                 🤖 Check Grammar
               {/if}
             </button>
+            {#if transcriptionEnabled}
             <button class="px-3 py-2 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 {isRecording ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}" on:click={toggleRecording} disabled={!transcriptionEnabled || isTranscribing || isCheckingGrammar}>
               {#if isTranscribing}
                 <svg class="animate-spin h-3 w-3 text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
@@ -1269,6 +1311,7 @@
                 🎤 Record Speech
               {/if}
             </button>
+            {/if}
             {/if}
           </div>
           {#if exportStatus}
@@ -1363,7 +1406,7 @@
             {/if}
           {/each}
           <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-amber-200"
-            aria-expanded={showCompanion} aria-controls={showCompanion ? 'reading-companion' : undefined} on:click={() => showCompanion = !showCompanion}>
+            aria-expanded={showCompanion} aria-controls={showCompanion ? 'reading-companion' : undefined} on:click={() => setReadingNotes(!showCompanion)}>
             {showCompanion ? 'Hide reading notes' : 'Reading notes'}
           </button>
           {#if desktopReading}
@@ -1414,11 +1457,14 @@
         style:--companion-width="{companionWidth}px">
         <div class="mb-3 flex shrink-0 items-center justify-between gap-2 border-b border-slate-800 pb-2">
           <h2 id="companion-title" class="text-sm font-semibold text-slate-200">Reading Companion</h2>
-          <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm" on:click={() => showCompanion = false}>Close notes</button>
+          <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm" on:click={() => setReadingNotes(false)}>Close notes</button>
         </div>
         
-        <div class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-6">
-          
+        <div class="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+          <StudyTutor bind:this={readingTutor} initialMode="excerpt" aiEnabled={subscriptionAI}
+            topicId={selectedTopic || 'General'} topicLabel={topicNames[selectedTopic] || selectedTopic || 'Credit risk'}
+            book={selectedBook || 'anderson'} page={desktopReading ? null : bookPages[selectedBook]} />
+
           <!-- Vocab Catcher -->
           <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
             <h3 class="text-xs font-bold text-teal-400 mb-2">⚡ Quick Vocab Catcher</h3>
@@ -1457,10 +1503,10 @@
             {/if}
           </div>
 
-          <!-- Doubt Catcher -->
+          <details class="rounded-lg border border-slate-700 p-2">
+            <summary class="cursor-pointer text-xs text-slate-200">Other reading tools</summary>
           <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700 flex flex-col flex-1">
-            <h3 class="text-xs font-bold text-amber-400 mb-2">❓ Confusing Concept / Grammar</h3>
-            <p class="text-[10px] text-slate-400 mb-3 leading-relaxed">Paste complex English grammar or confusing risk concepts here to be reviewed by AI IDE later.</p>
+            <h3 class="text-xs font-bold text-amber-200 mb-2">Reading note</h3>
             
             <textarea bind:value={doubtContent} on:paste={handlePaste} class="flex-1 w-full min-h-[150px] bg-slate-950 border border-slate-800 text-xs text-slate-300 px-2 py-2 rounded focus:border-amber-500 outline-none resize-none mb-3 custom-scrollbar" placeholder={subscriptionAI ? "Paste a sentence from the book…" : "Paste a sentence or an image from the book…"}></textarea>
             
@@ -1586,6 +1632,7 @@
               </div>
             {/if}
           </div>
+          </details>
 
         </div>
       </section>

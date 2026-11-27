@@ -19,6 +19,7 @@ from database import get_db
 from practice import PracticeInput, router as practice_router, save_practice
 from settings import BACKEND_DIR, INDEX_PATH, book_path
 import subscription
+from tutor import router as tutor_router
 
 
 load_dotenv(BACKEND_DIR / ".env")
@@ -28,6 +29,7 @@ ONLINE_HELPERS = os.getenv("TRACKER_ONLINE_HELPERS", "1") == "1"
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(practice_router)
 app.include_router(subscription.router)
+app.include_router(tutor_router)
 
 
 def configured_api_key():
@@ -513,7 +515,7 @@ def explain_concept(req: models.ExplainRequest):
         
         target_type = "gambar/grafik" if req.image_base64 and not req.text.strip() else "kalimat/paragraf ATAU gambar"
         
-        prompt = f"""
+        prompt = rf"""
 Anda adalah Senior Analyst yang sedang membimbing rekan kerja junior (non-Native Speaker).
 Tugas Anda adalah membedah dan menganalisis {target_type} teknis berikut agar mudah dipahami, baik secara konsep maupun kebahasaan. Jika berupa gambar, jelaskan setiap komponen atau alurnya secara mendetail.
 

@@ -56,3 +56,35 @@ after the shared Job AI provider service is installed. Create the root-owned
 `state/.ai` directory with group `oscar-job-ai` (GID 10001) and mode 0750.
 The tracker reads only the private socket inside its existing state mount.
 Gemini remains unavailable until an official Google CLI connection is set up.
+
+### Guided practice
+
+- **Reading notes → Ask about this excerpt** takes a pasted passage, book,
+  and PDF page reference. Explain it back in English and save the exercise to
+  Practice Journal.
+- Choose **Speaking**, **Listening**, or **Credit Risk** in Practice Editor
+  for voice exercises, shadowing, role-play and Case Lab. Listening reveals
+  the passage after an attempt and supports slower replay by sentence.
+- Each session can save two attempts, including their recordings. Speech
+  playback and recording use browser features. Automatic dictation uses an
+  installed on-device English pack where supported. The answer field also
+  accepts a typed transcript. Tutor feedback uses the transcript. Recordings
+  are transferred to the private tracker when the exercise is saved.
+- Open **Study details** in Practice Journal to replay both takes, or **Review
+  now** to recall the answer before revealing earlier feedback. Reviews are
+  scheduled in WIB.
+- **Copy prompt for Codex Voice** prepares the current exercise for a task
+  in the ChatGPT desktop app. Paste the prompt there and select **Start voice
+  chat** when available.
+
+Run the API regression suite against a disposable database in the built image:
+
+```sh
+docker run --rm --network none -e PYTHONPATH=/app \
+  -v "$PWD/tests:/tests:ro" <tracker-image> python -m unittest discover -s /tests -v
+```
+
+The browser fixture `tests/serve_guided_fixture.py` serves temporary content
+on loopback. Run `tests/browser-guided.mjs` with Playwright 1.65.0 and Chromium
+in the same network namespace. It uses a synthetic microphone stream and
+simulates device voice and dictation availability.

@@ -1,5 +1,6 @@
 <script>
   import { onMount } from 'svelte';
+  import StudyReview from './StudyReview.svelte';
   import { apiUrl, contexts, requestJson, skills, statuses } from '../practice.js';
 
   export let close;
@@ -12,6 +13,7 @@
   let nextOffset = null;
   let loading = false;
   let error = '';
+  let study;
 
   onMount(() => {
     dialog.showModal();
@@ -47,9 +49,17 @@
 <dialog bind:this={dialog} on:close={close} aria-labelledby="practice-journal-title" class="m-auto max-h-[90dvh] w-[min(94vw,58rem)] overflow-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 text-slate-100 backdrop:bg-slate-950/80 md:p-7">
   <div class="flex items-center justify-between gap-4">
     <h2 id="practice-journal-title" class="text-xl font-semibold">Practice journal</h2>
-    <button type="button" class="rounded-lg border border-slate-700 px-3 py-1.5 text-sm" on:click={() => dialog.close()}>Close</button>
+    <div class="flex flex-wrap gap-2 justify-end">
+      {#if !study}
+        <button type="button" class="rounded-lg border border-teal-800 px-3 py-1.5 text-sm text-teal-200" on:click={() => study = { mode: 'review' }}>Review practice</button>
+      {/if}
+      <button type="button" class="rounded-lg border border-slate-700 px-3 py-1.5 text-sm" on:click={() => dialog.close()}>Close</button>
+    </div>
   </div>
 
+  {#if study}
+    <StudyReview mode={study.mode} entryId={study.id || ''} back={() => study = null} />
+  {:else}
   <form class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" on:submit|preventDefault={applyFilters}>
     <label class="grid gap-1 text-xs text-slate-300">Search topic, notes, or feedback
       <input bind:value={filters.q} maxlength="200" class="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm" />
@@ -95,7 +105,12 @@
         <p class="mt-1 text-xs text-slate-400">{entry.skill} · {entry.context} · {statuses[entry.status]} · {entry.created_at.slice(0, 10)}</p>
         <p class="mt-2 line-clamp-2 whitespace-pre-wrap break-words text-sm text-slate-300">{entry.content}</p>
         <div class="mt-3 flex flex-wrap gap-4 text-sm text-teal-300">
-          <button type="button" class="underline underline-offset-2" on:click={() => edit(entry)}>Open entry</button>
+          {#if entry.guided}
+            <button type="button" class="underline underline-offset-2" on:click={() => study = { mode: 'details', id: entry.id }}>Study details</button>
+            <button type="button" class="underline underline-offset-2" on:click={() => study = { mode: 'review', id: entry.id }}>Review now</button>
+          {:else}
+            <button type="button" class="underline underline-offset-2" on:click={() => edit(entry)}>Open entry</button>
+          {/if}
           <a class="underline underline-offset-2" href={apiUrl + '/practice/' + entry.id + '/markdown'}>Download Markdown</a>
         </div>
       </article>
@@ -104,4 +119,5 @@
       <button type="button" class="rounded-lg border border-slate-700 p-2 text-sm disabled:opacity-60" on:click={() => loadPage(nextOffset)} disabled={loading}>Load more</button>
     {/if}
   </div>
+  {/if}
 </dialog>
