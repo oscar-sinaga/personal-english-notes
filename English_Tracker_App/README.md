@@ -1,9 +1,12 @@
-# English & Credit Risk Tracker
+# English Notes
 
 Read the Credit Risk books, time a study session, and save the original response,
-feedback, and revision together. Open **Practice Journal** to search by topic or
+feedback, and revision together. Open **Journal** to search by topic or
 text, filter by skill, context, dates, or status, and export CSV or Markdown.
 **History** contains the earlier tutor interactions.
+
+See the [Indonesian feature guide](docs/PANDUAN_FITUR.md) for screenshots and
+walkthroughs of the reader, tutor, voice practice, Case Lab, and journal.
 
 ## Local Windows development
 
@@ -37,19 +40,19 @@ SQLite with its backup API and seed it only once. Use `anderson.pdf` and
 
 Build the image from this directory with
 `docker build --build-arg VCS_REF=<git-commit> -t english-notes:<git-commit> .`.
-The Tencent image disables online translation, paid API helpers, and transcription.
-Reading, manual transcript entry, the journal, and downloads work offline.
+The Tencent image disables online translation, paid API helpers, and server-side transcription.
+Reading, manual transcript entry, the journal, and downloads work independently of the AI provider.
 The ACC repository contains the operator manifest, HTTPS route, resource cap,
 and guarded deployment procedure.
 
 ### Subscription AI
 
-Open **English AI Assistant → AI settings** to choose Codex or Claude Code
+Open **AI Assistant → AI settings** to choose Codex or Claude Code
 and a model. Model metadata refreshes on first use and after six hours.
 The selection applies to vocabulary definitions, grammar, text explanation,
 and tutor chat. The private workspace uses the host's native login for those
-requests. For a book-specific answer, paste the relevant excerpt into the
-explanation or chat. Existing recording and screenshot helpers are separate.
+requests. Use **Ask tutor** in the Study reader to send a selected passage and
+its PDF page to the tutor, or paste an excerpt into Reading notes.
 
 On Tencent, install both units in `deploy/tencent/` and enable `oscar-english-notes-ai.socket`
 after the shared Job AI provider service is installed. Create the root-owned
