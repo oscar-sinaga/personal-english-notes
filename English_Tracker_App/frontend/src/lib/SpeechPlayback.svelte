@@ -87,10 +87,10 @@
 
 <div class="space-y-2">
   <div class="flex flex-wrap items-center gap-2">
-    <button type="button" class="rounded-md bg-teal-400 px-3 py-2 text-xs font-semibold text-slate-950"
+    <button type="button" class="ui-button"
       disabled={disabled} on:click={playing ? stop : play}>{playing ? 'Stop playback' : label}</button>
     <label class="flex items-center gap-1 text-xs text-slate-300">Speed
-      <select bind:value={rate} class="rounded border border-slate-700 bg-slate-950 px-1.5 py-2">
+      <select aria-label="Speed" bind:value={rate} class="ui-input w-auto text-sm">
         <option value={0.7}>0.7×</option>
         <option value={0.85}>0.85×</option>
         <option value={1}>1×</option>
@@ -98,7 +98,7 @@
     </label>
     {#if parts.length > 1}
       <label class="flex items-center gap-1 text-xs text-slate-300">Replay
-        <select bind:value={part} class="rounded border border-slate-700 bg-slate-950 px-1.5 py-2">
+        <select aria-label="Replay" bind:value={part} class="ui-input w-auto text-sm">
           <option value={-1}>Whole passage</option>
           {#each parts as _, index}
             <option value={index}>Sentence {index + 1}</option>
@@ -108,7 +108,7 @@
     {/if}
     {#if voices.length > 1}
       <label class="flex min-w-0 max-w-full items-center gap-1 text-xs text-slate-300">Voice
-        <select bind:value={selected} class="min-w-0 max-w-[12rem] rounded border border-slate-700 bg-slate-950 px-1.5 py-2">
+        <select aria-label="Voice" bind:value={selected} class="ui-input max-w-[12rem] text-sm">
           {#each voices as voice (voice.voiceURI)}
             <option value={voice.voiceURI}>{voice.name}</option>
           {/each}

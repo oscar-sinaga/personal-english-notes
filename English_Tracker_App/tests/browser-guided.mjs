@@ -130,7 +130,7 @@ try {
   await reading.getByText(/Saved to Practice Journal/).waitFor();
   await button(page, "Dashboard").click();
 
-  await page.locator("#practice-skill").selectOption("Listening");
+  await button(page.getByRole("group", { name: "Practice skill" }), "Listening").click();
   const guide = page.getByRole("region", { name: "Guided practice" });
   await button(guide, "Generate exercise").click();
   await guide.getByText("What did the credit team review?").waitFor();
@@ -200,6 +200,7 @@ try {
   await button(guide, "Save to Practice Journal").click();
   await guide.getByText(/Saved to Practice Journal/).waitFor();
 
+  await button(page.getByRole("group", { name: "Practice skill" }), "Speaking").click();
   await guide.getByLabel("Exercise mode").selectOption("roleplay");
   await guide.getByLabel("Tutor role").selectOption("senior-analyst");
   await button(guide, "Generate exercise").click();
@@ -216,7 +217,7 @@ try {
   await browser.close();
   browser = await launch();
   const phone = await openPage({ mobile: true });
-  await phone.locator("#practice-skill").selectOption("Speaking");
+  await button(phone.getByRole("group", { name: "Practice skill" }), "Speaking").click();
   const mobile = phone.getByRole("region", { name: "Guided practice" });
   await mobile.getByLabel("Exercise mode").selectOption("shadowing");
   await button(mobile, "Generate exercise").click();

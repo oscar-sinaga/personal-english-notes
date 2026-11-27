@@ -4,10 +4,10 @@
   import { marked } from 'marked';
   import DOMPurify from 'dompurify';
   import markedKatex from 'marked-katex-extension';
-  import { draggable } from './draggable.js';
   import 'katex/dist/katex.min.css';
   import DailyPractice from './lib/DailyPractice.svelte';
   import BookReader from './lib/BookReader.svelte';
+  import Lexicon from './lib/Lexicon.svelte';
   import PracticeJournal from './lib/PracticeJournal.svelte';
   import StudyTutor from './lib/StudyTutor.svelte';
   import { apiUrl as API_URL, contexts, requestJson, saveEntry, skills, statuses } from './practice.js';
@@ -37,13 +37,23 @@
   let expandedBlocks = {};
   let expandedChapters = {};
 
-  let topicDropdownOpen = false;
-  let ddBlocks = {};
-  let ddChapters = {};
+  let pendingProgress = new Set();
+  let progressStatus = '';
+  const topicGroups = syllabusData.map(block => ({
+    label: block.name,
+    topics: [block, ...block.children.flatMap(chapter => [chapter, ...chapter.children])],
+  }));
+  const topicNames = Object.fromEntries(topicGroups.flatMap(group => group.topics.map(topic => [topic.id, topic.name])));
+  const courseTopics = syllabusData.flatMap(group => group.children.flatMap(chapter =>
+    chapter.children.length ? chapter.children : [chapter]));
 
   let timerActive = false;
-  let customMinutes = 20;
-  let timeRemaining = customMinutes * 60; 
+  let timerMinutes = 20;
+  let customMinutes = timerMinutes;
+  let timeRemaining = timerMinutes * 60;
+  let timerDeadline = 0;
+  let timerDialog;
+  let timerSettingsOpen = false;
   let currentPillarIndex = 0;
   const pillars = ["Active Writing", "Thinking & Circumlocution", "Role-Play"];
   let interval;
@@ -75,6 +85,9 @@
   let books = null;
   let exportStatus = "";
   let practiceEditor;
+  let practiceHeading;
+  let manualEntry;
+  let workspaceContent;
   let voiceTutor;
   let readingTutor;
   let guidedKey = 0;
@@ -86,12 +99,14 @@
   let newDef = "";
   let vocabStatus = "";
   let isAskingAI = false;
+  let savingVocab = false;
   let isExportingPDF = false;
 
   // Session Stats
   let sessionStats = { total_hours: 0, total_minutes: 0, last_topic: null };
   let sessionStatus = "";
   let weeklyStats = [];
+  $: peakMinutes = Math.max(1, ...weeklyStats.map(day => day.minutes));
 
   // App Layout State
   let appMode = "dashboard"; // 'dashboard' or 'reading'
@@ -110,8 +125,7 @@
   let browserPdfStatus = '';
   $: compactReading = appMode === 'reading' && nativePdfAvailable;
   $: desktopReading = compactReading && useBrowserPdf;
-  $: headerVisible = compactReading ? showReadingHeader : showHeader;
-  $: hideReadingOverlay = readerExpanded || desktopReading || (appMode === 'reading' && showCompanion);
+  $: headerVisible = !compactReading || showReadingHeader;
   $: selectedBook = books?.[currentBook] ? currentBook : Object.keys(bookTitles).find(book => books?.[book]);
 
   $: pdfUrl = selectedBook ? `${API_URL}/pdf?book=${selectedBook}` : '';
@@ -120,22 +134,20 @@
   let companionWidth = 384;
   let readingLayout;
   let isResizingCompanion = false;
-  let showGrammarModal = false;
-  let showDictionaryModal = false;
-  let showInteractionsModal = false;
+  let historyDialog;
+  let historyError = '';
 
   let savedInteractions = [];
   let interactionsFilter = "All"; // 'All', 'Chatbot', 'Grammar', 'Explain'
   let isFetchingInteractions = false;
   let showCompanion = false;
   let companionOpened = false;
-  let showHeader = true;
   let doubtContent = "";
   let doubtImageBase64 = null;
   let doubtStatus = "";
 
   // Chatbot State
-  let isChatOpen = false;
+  let assistantDialog;
   let isChatMaximized = false;
   let chatMessages = [];
   let chatInput = "";
@@ -175,6 +187,7 @@
     return () => {
       window.removeEventListener('beforeunload', warnUnsaved);
       stopResizeCompanion();
+      pauseTimer();
     };
   });
 
@@ -208,9 +221,8 @@
 
   async function fetchVocab() {
     try {
-      const res = await fetch(`${API_URL}/vocabulary`);
-      vocabularies = await res.json();
-    } catch (e) { console.error("Failed to fetch vocab.", e); }
+      vocabularies = await requestJson('/vocabulary');
+    } catch (error) { vocabStatus = error.message; }
   }
 
   async function fetchSessionStats() {
@@ -228,23 +240,23 @@
   }
 
   async function addVocab() {
-    if (!newTerm.trim() || !newDef.trim()) return;
+    if (savingVocab || !newTerm.trim() || !newDef.trim()) return;
+    savingVocab = true;
+    vocabStatus = '';
     try {
-      const res = await fetch(`${API_URL}/vocabulary`, {
+      await requestJson('/vocabulary', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ term: newTerm, definition: newDef })
       });
-      if (res.ok) {
-        newTerm = "";
-        newDef = "";
-        fetchVocab();
-        vocabStatus = "Saved!";
-        setTimeout(() => vocabStatus = "", 3000);
-      }
-    } catch (e) {
-      vocabStatus = "Failed to add term";
-      console.error(e);
+      newTerm = '';
+      newDef = '';
+      vocabStatus = 'Term saved.';
+      await fetchVocab();
+    } catch (error) {
+      vocabStatus = error.message;
+    } finally {
+      savingVocab = false;
     }
   }
 
@@ -305,27 +317,32 @@
   }
 
   async function toggleNode(id) {
+    if (pendingProgress.has(id)) return;
     const newState = !(progressMap[id] || false);
-    progressMap[id] = newState;
-    progressMap = progressMap; 
+    pendingProgress = new Set(pendingProgress).add(id);
+    progressMap = { ...progressMap, [id]: newState };
+    progressStatus = '';
     try {
-      await fetch(`${API_URL}/progress`, {
+      await requestJson('/progress', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ module_name: id, is_completed: newState })
       });
-    } catch (e) { console.error(e); }
+    } catch (error) {
+      progressMap = { ...progressMap, [id]: !newState };
+      progressStatus = error.message;
+    } finally {
+      pendingProgress.delete(id);
+      pendingProgress = new Set(pendingProgress);
+    }
   }
 
   function toggleBlock(id) { expandedBlocks[id] = !expandedBlocks[id]; }
   function toggleChapter(id) { expandedChapters[id] = !expandedChapters[id]; }
 
-  function toggleDropdownBlock(id) { ddBlocks[id] = !ddBlocks[id]; ddBlocks = ddBlocks; }
-  function toggleDropdownChapter(id) { ddChapters[id] = !ddChapters[id]; ddChapters = ddChapters; }
   function selectTopic(id) {
     if (id !== selectedTopic) practice.session_id = null;
     selectedTopic = id;
-    topicDropdownOpen = false;
   }
 
   // --- Resize Handlers (Companion) ---
@@ -365,47 +382,56 @@
       sessionStatus = "Enter a whole number from 1 to 120.";
       return;
     }
-    sessionStatus = "";
-    timeRemaining = customMinutes * 60;
-    elapsedSessionSeconds = 0;
     pauseTimer();
+    timerMinutes = customMinutes;
+    sessionStatus = 'Duration set to ' + timerMinutes + ' min.';
+    timeRemaining = timerMinutes * 60;
+    elapsedSessionSeconds = 0;
   }
 
   function startTimer() {
-    if (timerActive || savingSession) return;
+    if (timerActive || savingSession || !timeRemaining) return;
+    sessionStatus = '';
     timerActive = true;
     if (!elapsedSessionSeconds) {
       activeTimerPillar = appMode === 'reading' ? "Reading Comprehension" : pillars[currentPillarIndex];
       activeTimerTopic = selectedTopic || "General";
     }
+    timerDeadline = performance.now() + timeRemaining * 1000;
     interval = setInterval(() => {
-      if (timeRemaining > 0) { 
-        timeRemaining--; 
-        elapsedSessionSeconds++;
-      } 
-      else {
-        clearInterval(interval);
-        timerActive = false;
+      updateClock();
+      if (!timeRemaining) {
+        pauseTimer();
         logStudySession();
-        alert(`Time's up for ${activeTimerPillar} phase!`);
       }
-    }, 1000);
+    }, 250);
   }
-  function pauseTimer() { timerActive = false; clearInterval(interval); }
+  function updateClock() {
+    const remaining = Math.max(0, Math.min(timeRemaining, Math.ceil((timerDeadline - performance.now()) / 1000)));
+    elapsedSessionSeconds += timeRemaining - remaining;
+    timeRemaining = remaining;
+  }
+  function pauseTimer() {
+    if (timerActive) updateClock();
+    timerActive = false;
+    clearInterval(interval);
+  }
   async function nextPillar() {
-    if (savingSession || (elapsedSessionSeconds >= 60 && !(await logStudySession()))) return;
-    if (currentPillarIndex < pillars.length - 1) {
-      currentPillarIndex++;
-      elapsedSessionSeconds = 0;
-      timeRemaining = customMinutes * 60;
-      pauseTimer();
-    }
+    if (savingSession || currentPillarIndex >= pillars.length - 1) return;
+    if (timerActive) updateClock();
+    if (elapsedSessionSeconds >= 60 && !(await logStudySession())) return;
+    pauseTimer();
+    currentPillarIndex++;
+    elapsedSessionSeconds = 0;
+    timeRemaining = timerMinutes * 60;
+    sessionStatus = 'Next stage: ' + pillars[currentPillarIndex] + '.';
   }
   function resetTimer() {
+    pauseTimer();
     currentPillarIndex = 0;
     elapsedSessionSeconds = 0;
-    timeRemaining = customMinutes * 60;
-    pauseTimer();
+    timeRemaining = timerMinutes * 60;
+    sessionStatus = 'Timer reset.';
   }
   function formatTime(secs) {
     const m = Math.floor(secs / 60).toString().padStart(2, '0');
@@ -413,13 +439,18 @@
     return `${m}:${s}`;
   }
 
+  function showTimerSettings() {
+    timerSettingsOpen = true;
+    timerDialog.showModal();
+  }
+
   async function logStudySession() {
     if (savingSession) return false;
+    if (timerActive) updateClock();
     const elapsedMins = Math.round(elapsedSessionSeconds / 60);
     
     if (elapsedMins <= 0) {
-      sessionStatus = "Too short to log (< 1 min).";
-      setTimeout(() => sessionStatus = "", 2000);
+      sessionStatus = 'Log at least one minute of study time.';
       return false;
     }
     
@@ -427,7 +458,7 @@
     savingSession = true;
     sessionStatus = "Saving session...";
     try {
-      const res = await fetch(`${API_URL}/sessions`, {
+      lastSession = await requestJson('/sessions', {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -436,23 +467,16 @@
           duration_minutes: elapsedMins 
         })
       });
-      if (res.ok) {
-        lastSession = await res.json();
-        sessionStatus = `Logged ${elapsedMins} mins!`;
-        fetchSessionStats();
-        fetchWeeklyStats();
-        elapsedSessionSeconds = 0;
-        timeRemaining = customMinutes * 60; // Reset timer visually
-        pauseTimer();
-        return true;
-      } else {
-        sessionStatus = "Failed to log.";
-      }
-    } catch (e) {
-      sessionStatus = "Error saving.";
+      sessionStatus = `Saved ${elapsedMins} min of study time.`;
+      fetchSessionStats();
+      fetchWeeklyStats();
+      elapsedSessionSeconds = 0;
+      timeRemaining = timerMinutes * 60;
+      return true;
+    } catch (error) {
+      sessionStatus = error.message;
     } finally {
       savingSession = false;
-      setTimeout(() => sessionStatus = "", 3000);
     }
     return false;
   }
@@ -476,11 +500,13 @@
       && snapshot(data) !== savedSnapshot;
   }
 
-  function changeAppMode(mode) {
+  async function changeAppMode(mode) {
     if (appMode === mode) return;
     const tutor = appMode === 'reading' ? readingTutor : voiceTutor;
     if (tutor?.canLeave() === false) return;
     appMode = mode;
+    await tick();
+    workspaceContent?.focus();
   }
 
   async function setReadingNotes(open) {
@@ -488,7 +514,7 @@
     if (open) companionOpened = true;
     showCompanion = open;
     await tick();
-    if (open) readingTutor?.focusExcerpt();
+    if (open) readingTutor?.focusLesson();
     else notesButton?.focus();
   }
 
@@ -503,7 +529,7 @@
     if (!readingTutor) return false;
     if (!existingTutor) readingTutor.useExcerpt(source);
     await tick();
-    readingTutor.focusExcerpt(true);
+    readingTutor.focusLesson(true);
     return true;
   }
 
@@ -513,6 +539,12 @@
     practice = { ...practice, skill };
     guidedKey += 1;
     return true;
+  }
+
+  async function chooseSkill(skill) {
+    if (!changeSkill(skill) || !guidedModes[skill]) return;
+    await tick();
+    voiceTutor?.focusLesson();
   }
 
   function openPractice(entry) {
@@ -530,15 +562,21 @@
     grammarError = '';
     exportStatus = '';
     appMode = 'dashboard';
+    if (entry) focusPracticeEditor();
     return true;
+  }
+
+  async function focusPracticeEditor() {
+    await tick();
+    if (manualEntry) manualEntry.open = true;
+    (practiceEditor || practiceHeading)?.focus();
   }
 
   async function startDailyPractice(exercise, prompt) {
     if (!openPractice(null)) return;
     selectTopic(exercise.topic);
     practice = { ...practice, skill: exercise.skill, source: 'Latihan Hari Ini', prompt };
-    await tick();
-    practiceEditor?.focus();
+    await focusPracticeEditor();
   }
 
   async function submitLog() {
@@ -594,7 +632,6 @@
   }
 
   // Flat map for topic names
-  let topicNames = {};
   let isTranslating = false;
   let translateResult = null;
   let translateMode = 'quick';
@@ -812,24 +849,20 @@
     }
   }
 
-  async function toggleDictionary() {
-    showDictionaryModal = !showDictionaryModal;
-    if (showDictionaryModal && dictResult === null) {
-      // maybe fetch random word of the day later
-    }
+  function openAssistant() {
+    assistantDialog.showModal();
+    scrollToBottom();
   }
 
   async function openInteractionsModal() {
-    showInteractionsModal = true;
+    historyDialog.showModal();
     isFetchingInteractions = true;
+    historyError = '';
     try {
-      const res = await fetch(`${API_URL}/interactions`);
-      if (res.ok) {
-        const data = await res.json();
-        savedInteractions = data.interactions || [];
-      }
-    } catch (e) {
-      console.error("Failed to load interactions", e);
+      const data = await requestJson('/interactions');
+      savedInteractions = data.interactions || [];
+    } catch (error) {
+      historyError = error.message;
     } finally {
       isFetchingInteractions = false;
     }
@@ -890,554 +923,257 @@
     }
   }
 
-  $: {
-    syllabusData.forEach(block => {
-      topicNames[block.id] = block.name;
-      block.children.forEach(ch => {
-        topicNames[ch.id] = ch.name;
-        ch.children.forEach(sub => {
-          topicNames[sub.id] = sub.name;
-        });
-      });
-    });
-  }
-
-  // Calculate Progress
-  $: totalNodes = syllabusData.reduce((acc, block) => {
-    let blockCount = 0;
-    block.children.forEach(ch => {
-      blockCount += ch.children.length > 0 ? ch.children.length : 1;
-    });
-    return acc + blockCount;
-  }, 0);
-  
-  $: completedNodes = Object.values(progressMap).filter(Boolean).length;
-  $: progressPercent = totalNodes > 0 ? Math.round((completedNodes / totalNodes) * 100) : 0;
+  $: completedNodes = courseTopics.filter(topic => progressMap[topic.id]).length;
+  $: progressPercent = courseTopics.length ? Math.round(completedNodes * 100 / courseTopics.length) : 0;
 </script>
+
+{#snippet timer(compact = false)}
+  <div class="timer-tools" role="group" aria-label="Study timer">
+    <span class="study-clock" role="timer" aria-label="Time remaining">{formatTime(timeRemaining)}</span>
+    <button type="button" class="ui-button ui-quiet" on:click={() => timerActive ? pauseTimer() : startTimer()}
+      disabled={!timerActive && (savingSession || !timeRemaining)}>
+      {timerActive ? 'Pause' : elapsedSessionSeconds && timeRemaining ? 'Resume' : 'Start'}
+    </button>
+    <button type="button" class="ui-button ui-quiet" aria-label="Timer options" aria-haspopup="dialog" on:click={showTimerSettings}>
+      {compact ? 'Timer' : 'Timer options'}
+    </button>
+  </div>
+{/snippet}
+
+{#snippet lexicon()}
+  <Lexicon terms={vocabularies} bind:term={newTerm} bind:definition={newDef} status={vocabStatus}
+    {aiEnabled} askingAI={isAskingAI} saving={savingVocab} exporting={isExportingPDF}
+    add={addVocab} ask={askAIVocab} listen={playAudio} download={exportVocabPDF} />
+{/snippet}
+
+{#snippet manualPractice()}
+  <form class="grid gap-4" on:submit|preventDefault={submitLog}>
+    <div class="ui-label">
+      <label for="content">Original response or transcript</label>
+      <textarea id="content" bind:this={practiceEditor} bind:value={logContent} maxlength="25000" rows="5" class="ui-input"
+        placeholder="Write your answer or paste your speaking transcript."></textarea>
+    </div>
+    <details open={Boolean(practice.prompt)} class="ui-details rounded-lg border border-slate-700 px-3">
+      <summary class="text-sm font-medium text-slate-300">Source, prompt, feedback, and revision</summary>
+      <div class="grid gap-3 pb-3">
+        <label class="ui-label">Source or case reference
+          <input bind:value={practice.source} maxlength="500" class="ui-input" />
+        </label>
+        <label class="ui-label">Exercise prompt
+          <textarea bind:value={practice.prompt} maxlength="5000" rows="2" class="ui-input"></textarea>
+        </label>
+        <label class="ui-label">Feedback
+          <textarea bind:value={practice.feedback} maxlength="15000" rows="3" class="ui-input"></textarea>
+        </label>
+        <label class="ui-label">Revised response
+          <textarea bind:value={practice.revision} maxlength="25000" rows="4" class="ui-input"></textarea>
+        </label>
+      </div>
+    </details>
+    {#if grammarError}<p role="alert" class="text-sm text-rose-200">{grammarError}</p>{/if}
+    {#if grammarResult}
+      <section class="rounded-lg border border-slate-700 bg-slate-950 p-4" aria-label="Grammar feedback">
+        <dl class="grid gap-3 text-sm leading-relaxed">
+          <div><dt class="font-semibold text-teal-300">Corrected grammar</dt><dd class="whitespace-pre-wrap wrap-anywhere">{grammarResult.corrected}</dd></div>
+          <div><dt class="font-semibold text-teal-300">Natural alternative</dt><dd class="whitespace-pre-wrap wrap-anywhere">{grammarResult.native_alternative}</dd></div>
+          <div><dt class="font-semibold text-teal-300">Explanation</dt><dd class="whitespace-pre-wrap wrap-anywhere">{grammarResult.explanation}</dd></div>
+        </dl>
+        <button type="button" class="ui-button mt-3" on:click={() => {
+          practice.feedback = grammarResult.explanation || '';
+          practice.revision = grammarResult.corrected || '';
+          exportStatus = 'Feedback and revision added to this entry.';
+        }}>Copy feedback and correction to this entry</button>
+      </section>
+    {/if}
+    <div class="ui-label max-w-44">
+      <label for="entry-status">Status</label>
+      <select bind:value={practice.status} id="entry-status" class="ui-input">
+        {#each Object.entries(statuses) as [value, label]}<option {value}>{label}</option>{/each}
+      </select>
+    </div>
+    <div class="ui-actions">
+      <button class="ui-button ui-primary" disabled={!logContent.trim() || savingPractice}>
+        {savingPractice ? 'Saving…' : 'Save practice'}
+      </button>
+      {#if aiEnabled}
+        <button type="button" class="ui-button" on:click={checkGrammar}
+          disabled={!logContent.trim() || isCheckingGrammar || isTranscribing}>{isCheckingGrammar ? 'Checking…' : 'Check grammar'}</button>
+      {/if}
+      {#if transcriptionEnabled}
+        <button type="button" class="ui-button" on:click={toggleRecording} disabled={isTranscribing || isCheckingGrammar}>
+          {isTranscribing ? 'Transcribing…' : isRecording ? 'Stop recording' : 'Record speech'}
+        </button>
+      {/if}
+      {#if practice.version}
+        <a class="ui-button ui-quiet" href={API_URL + '/practice/' + practice.id + '/markdown'}>Download Markdown</a>
+      {/if}
+    </div>
+    {#if exportStatus}<p role="status" class="text-sm text-slate-200">{exportStatus}</p>{/if}
+  </form>
+{/snippet}
 
 {#if showPracticeJournal}
   <PracticeJournal close={() => showPracticeJournal = false} openEntry={openPractice} />
 {/if}
 
-<main class="min-h-dvh bg-slate-950 font-sans text-slate-100 p-3 lg:h-dvh lg:p-6 flex flex-col"
-  style:cursor={isResizingCompanion ? 'col-resize' : undefined}
-  style:height={compactReading ? '100dvh' : undefined}
-  style:padding={compactReading ? '0.5rem' : undefined}>
-  
-  <!-- Interactions Modal -->
-  {#if showInteractionsModal}
-  <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-    <div class="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl">
-      <!-- Header -->
-      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-800/30 rounded-t-xl shrink-0">
-        <div>
-          <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-fuchsia-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-            Saved Learnings
-          </h2>
-          <p class="text-[11px] text-slate-400 uppercase tracking-widest mt-1">Your AI Interaction History</p>
+<div class="app-shell" class:reading-shell={appMode === 'reading'} class:compact-reader={compactReading}
+  style:cursor={isResizingCompanion ? 'col-resize' : undefined}>
+  <a class="ui-button ui-primary skip-link" inert={readerExpanded} href="#workspace-content">Skip to content</a>
+  {#if headerVisible}
+    <header class="app-header" id="tracker-header" inert={readerExpanded}>
+      <div class="app-brand">
+        <div class="app-brand-mark" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5c-1.746 0-3.332.477-4.5 1.253v13C4.168 18.477 5.754 18 7.5 18c1.746 0 3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
         </div>
-        <div class="flex items-center gap-4">
-          <select bind:value={interactionsFilter} class="bg-slate-800 border border-slate-700 text-sm text-slate-300 rounded px-2 py-1 outline-none">
-            <option value="All">All Types</option>
-            <option value="Chatbot">Chatbot</option>
-            <option value="Grammar">Grammar</option>
-            <option value="Explain">Magic Explain</option>
-          </select>
-          <button class="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors" on:click={() => showInteractionsModal = false}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+        <div>
+          <h1 class="text-lg font-semibold leading-tight tracking-tight">English Notes</h1>
+          <p class="text-sm text-slate-400">English &amp; credit risk</p>
         </div>
       </div>
-      
-      <!-- Body -->
-      <div class="flex-1 overflow-y-auto p-6 custom-scrollbar bg-slate-900 rounded-b-xl">
-        {#if isFetchingInteractions}
-          <div class="text-center py-10 text-slate-400 animate-pulse">Loading history...</div>
-        {:else if savedInteractions.length === 0}
-          <div class="text-center py-10 text-slate-500">No interactions saved yet. Start using Chatbot or Magic Explain!</div>
-        {:else}
-          <div class="flex flex-col gap-4">
-            {#each savedInteractions.filter(i => interactionsFilter === 'All' || i.interaction_type === interactionsFilter) as item}
-              <div class="bg-slate-800/40 border border-slate-700/50 rounded-lg p-4 hover:bg-slate-800/60 transition-colors group">
-                <div class="flex items-center justify-between mb-3 border-b border-slate-700/50 pb-2">
-                  <span class="text-xs font-bold px-2 py-0.5 rounded {item.interaction_type === 'Chatbot' ? 'bg-sky-900/50 text-sky-400' : item.interaction_type === 'Grammar' ? 'bg-amber-900/50 text-amber-400' : 'bg-purple-900/50 text-purple-400'}">
-                    {item.interaction_type}
-                  </span>
-                  <span class="text-[10px] text-slate-500 font-mono">
-                    {new Date(item.created_at).toLocaleString()}
-                  </span>
-                </div>
-                
-                <div class="mb-3">
-                  <div class="text-[10px] font-bold text-slate-500 uppercase mb-1">Your Input</div>
-                  <div class="text-sm text-slate-300 italic border-l-2 border-slate-600 pl-3">"{item.input_text}"</div>
-                </div>
-                
-                <div>
-                  <div class="text-[10px] font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 rounded-full bg-teal-500"></span> AI Response
-                  </div>
-                  <div class="text-sm text-slate-200 markdown-body bg-slate-950/30 p-3 rounded-md">
-                    {@html renderMarkdown(item.response_text)}
-                  </div>
-                </div>
-              </div>
+      <nav class="app-nav" aria-label="Main navigation">
+        <button type="button" class="ui-button ui-quiet" aria-current={appMode === 'dashboard' ? 'page' : undefined}
+          on:click={() => changeAppMode('dashboard')}>Dashboard</button>
+        <button type="button" class="ui-button ui-quiet" aria-current={appMode === 'reading' ? 'page' : undefined}
+          on:click={() => changeAppMode('reading')}>Read Book</button>
+        <button type="button" class="ui-button ui-quiet" aria-haspopup="dialog" aria-label="Practice Journal"
+          on:click={() => showPracticeJournal = true}>Journal</button>
+        <button type="button" class="ui-button ui-quiet" aria-haspopup="dialog" on:click={openAssistant}>AI Assistant</button>
+      </nav>
+      {@render timer()}
+    </header>
+  {/if}
+  {#if sessionStatus && !timerSettingsOpen}
+    <p class="session-status mb-3 text-sm text-slate-300" role="status">{sessionStatus}</p>
+  {/if}
+
+  <main id="workspace-content" tabindex="-1" bind:this={workspaceContent}
+    class={appMode === 'reading' ? 'flex min-h-0 flex-1' : ''}>
+  {#if appMode === 'dashboard'}
+    <div class="study-layout">
+      <div class="study-column">
+        <DailyPractice start={startDailyPractice} />
+        <section class="ui-card practice-editor" id="practice-editor" aria-labelledby="practice-editor-title">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <h2 class="ui-title" id="practice-editor-title" bind:this={practiceHeading} tabindex="-1">Practice Editor</h2>
+            <div class="ui-actions">
+              <a class="ui-button ui-quiet lg:hidden" href="#study-resources">Study resources</a>
+              <button type="button" class="ui-button ui-quiet" disabled={savingPractice}
+                on:click={() => { if (openPractice(null)) focusPracticeEditor(); }}>New entry</button>
+            </div>
+          </div>
+          <div class="skill-picker" role="group" aria-label="Practice skill">
+            {#each skills as skill}
+              <button type="button" class="ui-button" aria-pressed={practice.skill === skill}
+                on:click={() => chooseSkill(skill)}>{skill === 'Credit Risk' ? 'Credit Risk Case Lab' : skill}</button>
             {/each}
           </div>
-        {/if}
-      </div>
-    </div>
-  </div>
-  {/if}
-
-  <!-- Top Navbar -->
-  {#if headerVisible}
-  <header id="tracker-header" inert={readerExpanded} class="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-xl mb-4 shrink-0 relative z-20 sm:p-4 lg:mb-6">
-    <div class="flex min-w-0 items-center gap-3">
-      <div class="h-10 w-10 shrink-0 bg-teal-500/20 text-teal-400 rounded-lg flex items-center justify-center border border-teal-500/30">
-        {#if appMode === 'dashboard'}
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-        {:else}
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-        {/if}
-      </div>
-      <div>
-        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white">English &amp; Credit Risk Tracker</h1>
-        <p class="text-xs text-slate-400 font-mono tracking-wider">
-          {appMode === 'dashboard' ? 'Practice, progress, and vocabulary' : 'Credit risk library'}
-        </p>
-      </div>
-    </div>
-    <div class="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
-      
-      <!-- Mode Switcher Buttons -->
-      <div class="flex flex-wrap border border-slate-700 rounded-lg p-1 bg-slate-950">
-        <button aria-current={appMode === 'dashboard' ? 'page' : undefined}
-          class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'dashboard' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => changeAppMode('dashboard')}>
-          Dashboard
-        </button>
-        <button aria-current={appMode === 'reading' ? 'page' : undefined}
-          class="px-2 py-2 text-xs font-bold rounded-md sm:px-4 transition-colors {appMode === 'reading' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-white'}" on:click={() => changeAppMode('reading')}>
-          Read Book
-        </button>
-        <button class="rounded-md px-2 py-2 text-xs font-bold text-teal-300 sm:px-4 hover:bg-slate-800" on:click={() => showPracticeJournal = true}>
-          Practice Journal
-        </button>
-      </div>
-
-      <!-- Mini Timer (Global) -->
-      <div class="flex items-center bg-slate-900 border border-slate-700 rounded-lg overflow-hidden h-9">
-        <div class="px-3 bg-slate-950 font-mono font-bold {timeRemaining < 60 ? 'text-amber-500' : 'text-teal-400'} border-r border-slate-700 h-full flex items-center justify-center min-w-[70px]">
-          {formatTime(timeRemaining)}
-        </div>
-        {#if !timerActive}
-          <button class="px-3 h-full hover:bg-slate-800 text-slate-400 hover:text-teal-400 transition-colors flex items-center justify-center cursor-pointer" on:click={startTimer} title="Start Timer">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2e-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>
-          </button>
-        {:else}
-          <button class="px-3 h-full hover:bg-slate-800 text-amber-500 hover:text-amber-400 transition-colors flex items-center justify-center cursor-pointer" on:click={pauseTimer} title="Pause Timer">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-          </button>
-        {/if}
-        <button class="px-3 h-full border-l border-slate-700 hover:bg-slate-800 text-indigo-400 hover:text-indigo-300 transition-colors flex items-center justify-center cursor-pointer" on:click={logStudySession} title="Log Time">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>
-        </button>
-        <button class="px-3 h-full border-l border-slate-700 hover:bg-slate-800 text-fuchsia-400 hover:text-fuchsia-300 transition-colors flex items-center justify-center cursor-pointer font-bold text-[11px] uppercase tracking-wider" on:click={openInteractionsModal} title="Saved Learnings">
-          History
-        </button>
-      </div>
-
-      <!-- Progress & Analytics -->
-      <div class="{appMode === 'reading' ? 'hidden sm:flex' : 'flex'} flex-wrap items-center gap-x-3 gap-y-2">
-        <!-- Focus Analytics -->
-        <div class="border-l border-slate-800 pl-3">
-          <div class="text-xs text-slate-400 mb-1">FOCUS HOURS</div>
-          <div class="flex items-center gap-3 justify-end">
-            <span class="font-mono font-bold {sessionStats.total_hours > 100 ? 'text-teal-400' : 'text-sky-400'}">{sessionStats.total_hours} <span class="text-xs text-slate-500">h</span></span>
-          </div>
-        </div>
-        
-        <!-- Module Progress -->
-        <div class="border-l border-slate-800 pl-3">
-          <div class="text-xs text-slate-400 mb-1">COURSE PROGRESS</div>
-          <div class="flex items-center gap-3">
-            <div class="w-16 sm:w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
-              <div class="h-full bg-teal-500 rounded-full transition-all duration-500" style="width: {progressPercent}%"></div>
-            </div>
-            <span class="font-mono font-bold {progressPercent > 50 ? 'text-teal-400' : 'text-amber-400'}">{progressPercent}%</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Hide Header Button -->
-      <button class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer" on:click={() => {
-        if (compactReading) showReadingHeader = false;
-        else showHeader = false;
-      }} title="Hide Top Navigation">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" /></svg>
-      </button>
-    </div>
-  </header>
-  {:else if !compactReading}
-  <!-- Floating Show Header Button -->
-  <button inert={readerExpanded} class="fixed top-0 left-1/2 -translate-x-1/2 z-50 bg-slate-800 hover:bg-teal-600 text-slate-400 hover:text-slate-950 px-6 py-1 rounded-b-xl shadow-lg border-b border-x border-slate-700 hover:border-teal-500 transition-all cursor-pointer group flex flex-col items-center justify-center gap-0.5" on:click={() => showHeader = true} title="Show Top Navigation">
-    <span class="text-[9px] font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity h-0 group-hover:h-auto overflow-hidden">Show Navbar</span>
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-  </button>
-  {/if}
-
-  <!-- ============================================== -->
-  <!-- DASHBOARD MODE LAYOUT (3-6-3)                  -->
-  <!-- ============================================== -->
-  {#if appMode === 'dashboard'}
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 lg:flex-1 lg:min-h-0 relative z-10">
-    
-    <!-- Left Column: Syllabus Tree (Scrollable) -->
-    <section class="min-w-0 lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-xl flex flex-col lg:max-h-full lg:overflow-hidden">
-      
-      <!-- Weekly Progress Chart -->
-      <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-3 pb-1 border-b border-slate-800">Weekly Progress</h2>
-      <div class="flex items-end justify-between h-20 gap-1 mb-5 px-1 shrink-0">
-        {#each weeklyStats as stat}
-          <div class="flex flex-col items-center flex-1 group">
-            <div class="relative w-full flex justify-center h-16 items-end bg-slate-800/30 rounded-t-sm">
-              <div class="w-full max-w-[20px] bg-sky-500 rounded-t-sm opacity-80 group-hover:opacity-100 transition-all duration-300 relative group-hover:bg-teal-400" style="height: {Math.max(Math.min((stat.minutes / 120) * 100, 100), stat.minutes > 0 ? 5 : 0)}%;">
-                <span class="absolute -top-5 left-1/2 -translate-x-1/2 text-[9px] font-bold text-teal-300 opacity-0 group-hover:opacity-100 transition-opacity">{stat.minutes}m</span>
-              </div>
-            </div>
-            <span class="text-[9px] text-slate-500 mt-1 font-mono uppercase tracking-widest">{stat.day_name}</span>
-          </div>
-        {/each}
-        {#if weeklyStats.length === 0}
-          <div class="text-xs text-slate-600 w-full text-center">Loading chart...</div>
-        {/if}
-      </div>
-
-      <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2">Course Syllabus</h2>
-      
-      <div class="overflow-y-auto pr-2 custom-scrollbar flex-1">
-        {#each syllabusData as block}
-          <div class="mb-2">
-            <button class="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-transparent hover:border-slate-700 transition-all text-left group cursor-pointer" on:click={() => toggleBlock(block.id)}>
-              <span class="text-slate-500 text-xs transition-transform duration-300 {expandedBlocks[block.id] ? 'rotate-90 text-teal-400' : ''}">▶</span>
-              <strong class="text-slate-200 text-sm">{block.name}</strong>
-            </button>
-            
-            {#if expandedBlocks[block.id]}
-              <div class="ml-3 mt-1 pl-3 border-l-2 border-slate-800 flex flex-col gap-1 pb-2">
-                {#each block.children as chapter}
-                  <div class="mt-1">
-                    <button class="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-800 transition-colors text-left group cursor-pointer" on:click={() => toggleChapter(chapter.id)}>
-                      <span class="text-slate-600 text-[10px] transition-transform duration-300 {expandedChapters[chapter.id] ? 'rotate-90 text-teal-400' : ''}">▶</span>
-                      <span class="text-slate-300 text-sm truncate" title={chapter.name}>{chapter.name}</span>
-                    </button>
-
-                    {#if expandedChapters[chapter.id]}
-                      <div class="ml-4 mt-1 pl-3 border-l border-dashed border-slate-700 flex flex-col gap-1">
-                        {#each chapter.children as sub}
-                          <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-800 cursor-pointer transition-colors group">
-                            <input type="checkbox" class="w-3.5 h-3.5 rounded border-slate-600 text-teal-500 bg-slate-900 cursor-pointer" checked={progressMap[sub.id]} on:change={() => toggleNode(sub.id)} />
-                            <span class="text-xs text-slate-400 group-hover:text-slate-200 transition-colors {progressMap[sub.id] ? 'line-through opacity-50' : ''} truncate">{sub.name}</span>
-                          </label>
-                        {/each}
-                        {#if chapter.children.length === 0}
-                          <label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-800 cursor-pointer transition-colors">
-                            <input type="checkbox" class="w-3.5 h-3.5 rounded border-slate-600 text-teal-500 bg-slate-900 cursor-pointer" checked={progressMap[chapter.id]} on:change={() => toggleNode(chapter.id)} />
-                            <span class="text-xs text-slate-400 {progressMap[chapter.id] ? 'line-through opacity-50' : ''}">Mark complete</span>
-                          </label>
-                        {/if}
-                      </div>
-                    {/if}
-                  </div>
+          <div class="mb-4 grid gap-3 min-[480px]:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <div class="ui-label">
+              <label for="practice-topic">Topic</label>
+              <select class="ui-input" id="practice-topic" value={selectedTopic} on:change={event => selectTopic(event.currentTarget.value)}>
+                {#if selectedTopic && !topicNames[selectedTopic]}<option value={selectedTopic}>{selectedTopic}</option>{/if}
+                {#each topicGroups as group}
+                  <optgroup label={group.label}>
+                    {#each group.topics as topic}<option value={topic.id}>{topic.name}</option>{/each}
+                  </optgroup>
                 {/each}
-              </div>
-            {/if}
+              </select>
+            </div>
+            <div class="ui-label">
+              <label for="entry-context">Context</label>
+              <select bind:value={practice.context} id="entry-context" class="ui-input">
+                {#each contexts as context}<option value={context}>{context}</option>{/each}
+              </select>
+            </div>
           </div>
-        {/each}
-      </div>
-
-      {#if sessionStats.last_topic}
-        <div class="mt-4 pt-3 border-t border-slate-800 shrink-0">
-          <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Last Studied Topic</div>
-          <div class="text-xs text-indigo-400 truncate bg-slate-950 p-2 rounded border border-slate-800">{topicNames[sessionStats.last_topic] || sessionStats.last_topic}</div>
-        </div>
-      {/if}
-    </section>
-
-    <!-- Center Column: Main Operations (Timer & Logger) -->
-    <section class="order-first lg:order-none min-w-0 lg:col-span-6 flex flex-col gap-4 lg:gap-6 lg:max-h-full lg:overflow-y-auto custom-scrollbar lg:pr-2">
-      <DailyPractice start={startDailyPractice} />
-      
-      <!-- Timer Panel -->
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-xl relative overflow-hidden shrink-0">
-        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-sky-500"></div>
-        <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
-          <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider">Phase Controller</h2>
-          <span class="px-3 py-1 bg-slate-800 rounded-full text-xs font-mono text-teal-400 border border-slate-700">{pillars[currentPillarIndex]}</span>
-        </div>
-        
-        <div class="text-center">
-          <div class="text-5xl sm:text-7xl font-black tracking-tight tabular-nums text-white mb-4 font-mono drop-shadow-[0_0_10px_rgba(20,184,166,0.3)]">
-            {formatTime(timeRemaining)}
-          </div>
-          <div class="flex flex-wrap justify-center items-center gap-2 mb-4">
-            <input type="number" aria-label="Duration in minutes" bind:value={customMinutes} min="1" max="120" class="w-16 bg-slate-950 text-center rounded border border-slate-700 text-slate-200 outline-none focus:border-teal-500 text-sm py-1">
-            <span class="text-slate-400 self-center text-xs">min</span>
-            <button on:click={setTimer} class="px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs font-bold text-slate-300 transition-colors cursor-pointer">Set Time</button>
-            {#if sessionStatus} <span class="text-teal-400 self-center text-xs ml-2">{sessionStatus}</span> {/if}
-          </div>
-          <div class="grid grid-cols-2 gap-2 xl:flex xl:flex-wrap xl:justify-center">
-            {#if !timerActive}
-              <button class="px-3 py-2 rounded-lg font-bold bg-teal-500 hover:bg-teal-400 text-slate-950 transition-colors cursor-pointer" on:click={startTimer}>Start Run</button>
-            {:else}
-              <button class="px-3 py-2 rounded-lg font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-colors cursor-pointer" on:click={pauseTimer}>Pause</button>
-            {/if}
-            <button class="px-3 py-2 rounded-lg font-bold bg-rose-600 hover:bg-rose-500 text-white transition-colors cursor-pointer disabled:opacity-50" on:click={logStudySession} disabled={elapsedSessionSeconds < 60}>Stop & Save</button>
-            <button class="px-3 py-2 rounded-lg font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition-colors cursor-pointer disabled:opacity-50" on:click={resetTimer}>Reset</button>
-            <button class="px-3 py-2 rounded-lg font-bold bg-sky-500 hover:bg-sky-400 text-slate-950 transition-colors cursor-pointer disabled:opacity-50" on:click={nextPillar} disabled={currentPillarIndex === pillars.length - 1}>Next Stage</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Logger Panel -->
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-6 shadow-xl flex-1 flex flex-col">
-        <div class="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-          <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400">Practice Editor</h2>
-          <button type="button" class="rounded-lg border border-teal-800 px-2 py-1 text-xs text-teal-200" on:click={() => changeSkill('Credit Risk')}>Credit Risk Case Lab</button>
-        </div>
-        
-        <div class="grid grid-cols-1 gap-3 mb-4 min-[420px]:grid-cols-2">
-          <div class="relative flex min-w-0 flex-col gap-1.5">
-            <span class="text-xs text-slate-500">Mapping Topic:</span>
-            <button class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 text-left focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none flex justify-between items-center" on:click={() => topicDropdownOpen = !topicDropdownOpen}>
-              <span class="min-w-0 truncate">{topicNames[selectedTopic] || selectedTopic || "Select Topic..."}</span>
-              <svg class="w-4 h-4 shrink-0 text-slate-500 transition-transform {topicDropdownOpen ? 'rotate-180' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
-            </button>
-
-            {#if topicDropdownOpen}
-              <div class="fixed inset-0 z-40" on:click={() => topicDropdownOpen = false}></div>
-              <div class="absolute top-[100%] left-0 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-2xl z-50 max-h-64 overflow-y-auto custom-scrollbar p-2">
-                {#each syllabusData as block}
-                  <div class="mb-1">
-                    <button class="w-full text-left px-2 py-1.5 text-xs font-bold text-slate-300 hover:bg-slate-800 rounded flex items-center gap-2" on:click={() => toggleDropdownBlock(block.id)}>
-                      <span class="text-slate-500 transition-transform {ddBlocks[block.id] ? 'rotate-90 text-teal-400' : ''}">▶</span>
-                      {block.name}
-                    </button>
-                    {#if ddBlocks[block.id]}
-                      <div class="ml-3 border-l border-slate-700 pl-2 mt-1">
-                        {#each block.children as chapter}
-                          <button class="w-full text-left px-2 py-1 text-[11px] text-slate-400 hover:bg-slate-800 rounded flex items-center gap-2" on:click={() => toggleDropdownChapter(chapter.id)}>
-                            <span class="text-slate-600 transition-transform {ddChapters[chapter.id] ? 'rotate-90 text-teal-400' : ''}">▶</span>
-                            {chapter.name}
-                          </button>
-                          {#if ddChapters[chapter.id]}
-                            <div class="ml-3 border-l border-dashed border-slate-700 pl-2 mt-1 mb-1 flex flex-col items-start">
-                              {#each chapter.children as sub}
-                                <button class="w-full text-left px-2 py-1 text-[11px] text-slate-500 hover:text-teal-400 hover:bg-slate-800 rounded truncate {selectedTopic === sub.id ? 'bg-slate-800 text-teal-400 font-bold' : ''}" on:click={() => selectTopic(sub.id)}>
-                                  • {sub.name}
-                                </button>
-                              {/each}
-                              {#if chapter.children.length === 0}
-                                <button class="w-full text-left px-2 py-1 text-[11px] text-slate-500 hover:text-teal-400 hover:bg-slate-800 rounded truncate {selectedTopic === chapter.id ? 'bg-slate-800 text-teal-400 font-bold' : ''}" on:click={() => selectTopic(chapter.id)}>
-                                  • Select Chapter
-                                </button>
-                              {/if}
-                            </div>
-                          {/if}
-                        {/each}
-                      </div>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </div>
-          <div class="flex flex-col gap-1.5">
-            <label for="practice-skill" class="text-xs text-slate-400">Skill</label>
-            <select id="practice-skill" value={practice.skill} on:change={event => {
-              if (!changeSkill(event.currentTarget.value)) event.currentTarget.value = practice.skill;
-            }} class="bg-slate-950 border border-slate-800 text-slate-300 text-sm rounded-lg py-2 px-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 cursor-pointer outline-none">
-              {#each skills as skill}<option value={skill}>{skill}</option>{/each}
-            </select>
-          </div>
-        </div>
-        <div class="mb-3 grid grid-cols-2 gap-3">
-          <label class="grid gap-1 text-xs text-slate-400">Context
-            <select bind:value={practice.context} class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
-              {#each contexts as context}<option value={context}>{context}</option>{/each}
-            </select>
-          </label>
-          <label class="grid gap-1 text-xs text-slate-400">Status
-            <select bind:value={practice.status} class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200">
-              {#each Object.entries(statuses) as [value, label]}<option {value}>{label}</option>{/each}
-            </select>
-          </label>
-        </div>
-
-        {#if guidedModes[practice.skill]}
-          <div class="mb-4">
+          {#if guidedModes[practice.skill]}
             {#key guidedKey}
               <StudyTutor bind:this={voiceTutor} initialMode={guidedModes[practice.skill]} aiEnabled={subscriptionAI}
                 topicId={selectedTopic || 'General'} topicLabel={topicNames[selectedTopic] || selectedTopic || 'Credit risk'} context={practice.context} />
             {/key}
-          </div>
-        {/if}
-        <div class="flex flex-col gap-1.5">
-          <label for="content" class="text-xs text-slate-400">Original response or transcript</label>
-          <textarea id="content" bind:this={practiceEditor} bind:value={logContent} maxlength="25000" rows="5" class="w-full bg-slate-950 border border-slate-800 text-slate-200 text-sm rounded-lg p-3 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 outline-none" placeholder="Write your explanation or paste your speaking transcript."></textarea>
-        </div>
-        <details open={Boolean(practice.prompt)} class="mt-3 rounded-lg border border-slate-800 p-3">
-          <summary class="cursor-pointer text-sm text-slate-300">Source, prompt, feedback, and revision</summary>
-          <div class="mt-3 grid gap-3">
-            <label class="grid gap-1 text-xs text-slate-400">Source or case reference
-              <input bind:value={practice.source} maxlength="500" class="rounded-lg border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-slate-200" />
-            </label>
-            <label class="grid gap-1 text-xs text-slate-400">Exercise prompt
-              <textarea bind:value={practice.prompt} maxlength="5000" rows="2" class="rounded-lg border border-slate-800 bg-slate-950 p-2 text-sm text-slate-200"></textarea>
-            </label>
-            <label class="grid gap-1 text-xs text-slate-400">Feedback
-              <textarea bind:value={practice.feedback} maxlength="15000" rows="3" class="rounded-lg border border-slate-800 bg-slate-950 p-2 text-sm text-slate-200"></textarea>
-            </label>
-            <label class="grid gap-1 text-xs text-slate-400">Revised response
-              <textarea bind:value={practice.revision} maxlength="25000" rows="4" class="rounded-lg border border-slate-800 bg-slate-950 p-2 text-sm text-slate-200"></textarea>
-            </label>
-          </div>
-        </details>
-
-        <!-- AI Grammar Checker Results -->
-        {#if grammarError}
-          <div class="mt-3 p-3 bg-red-950/40 border border-red-800 rounded-lg text-xs text-red-300">
-            <strong>Error:</strong> {grammarError}
-          </div>
-        {/if}
-        {#if grammarResult}
-          <div class="mt-3 p-3 bg-indigo-950/40 border border-indigo-800 rounded-lg shadow-inner max-h-[200px] overflow-y-auto custom-scrollbar">
-            <div class="mb-2">
-              <span class="text-[10px] font-bold text-teal-400 uppercase tracking-wider">Corrected Grammar</span>
-              <p class="text-xs text-slate-200 mt-1">{grammarResult.corrected}</p>
-            </div>
-            <div class="mb-2">
-              <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Native Alternative</span>
-              <p class="text-xs text-slate-200 mt-1 italic">"{grammarResult.native_alternative}"</p>
+            <details class="ui-details mt-4 rounded-lg border border-slate-700 px-3" bind:this={manualEntry}>
+              <summary class="text-sm font-medium text-slate-300">Manual journal entry</summary>
+              <div class="pb-3">{@render manualPractice()}</div>
+            </details>
+          {:else}
+            {@render manualPractice()}
+          {/if}
+        </section>
+      </div>
+      <aside id="study-resources" class="resource-column" aria-label="Study resources" tabindex="-1">
+        <section class="ui-card" aria-labelledby="progress-title">
+          <h2 class="ui-title" id="progress-title">Study progress</h2>
+          <dl class="my-4 grid grid-cols-2 gap-3">
+            <div>
+              <dt class="text-sm text-slate-400">Focus time</dt>
+              <dd class="mt-1 text-2xl font-semibold tabular-nums">{sessionStats.total_hours} <span class="text-sm font-normal text-slate-300">h</span></dd>
             </div>
             <div>
-              <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Explanation</span>
-              <p class="text-[11px] text-slate-400 mt-1">{grammarResult.explanation}</p>
+              <dt class="text-sm text-slate-400">Course completed</dt>
+              <dd class="mt-1 text-2xl font-semibold tabular-nums">{progressPercent}%</dd>
             </div>
-            <button type="button" class="mt-2 text-xs font-semibold text-teal-300" on:click={() => {
-              practice.feedback = grammarResult.explanation || '';
-              practice.revision = grammarResult.corrected || '';
-            }}>Copy feedback and correction to this entry</button>
-          </div>
-        {/if}
-        
-        {#if books && !aiEnabled}
-          <p class="mt-3 text-xs text-slate-400">Write your answer, paste a transcript, or use your device’s keyboard dictation.</p>
-        {/if}
-        <div class="mt-4 flex items-center justify-between gap-2">
-          <div class="flex flex-wrap items-center gap-2">
-            <button class="px-4 py-2 rounded-lg font-bold bg-teal-400 text-slate-950 hover:bg-teal-300 transition-colors disabled:opacity-50 cursor-pointer" on:click={submitLog} disabled={!logContent.trim() || savingPractice}>
-              {savingPractice ? 'Saving…' : 'Save practice'}
-            </button>
-            <button class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300" on:click={() => openPractice(null)} disabled={savingPractice}>New entry</button>
-            {#if practice.version}
-              <a class="px-2 text-sm text-teal-300 underline" href={API_URL + '/practice/' + practice.id + '/markdown'}>Markdown</a>
-            {/if}
-            {#if aiEnabled}
-            <button class="px-3 py-2 rounded-lg font-bold bg-indigo-600 hover:bg-indigo-500 text-slate-100 transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50" on:click={checkGrammar} disabled={!aiEnabled || !logContent.trim() || isCheckingGrammar}>
-              {#if isCheckingGrammar}
-                <svg class="animate-spin h-3 w-3 text-slate-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Checking...
-              {:else}
-                🤖 Check Grammar
-              {/if}
-            </button>
-            {#if transcriptionEnabled}
-            <button class="px-3 py-2 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 {isRecording ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}" on:click={toggleRecording} disabled={!transcriptionEnabled || isTranscribing || isCheckingGrammar}>
-              {#if isTranscribing}
-                <svg class="animate-spin h-3 w-3 text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Transcribing...
-              {:else if isRecording}
-                🛑 Stop Recording
-              {:else}
-                🎤 Record Speech
-              {/if}
-            </button>
-            {/if}
-            {/if}
-          </div>
-          {#if exportStatus}
-            <span class="text-teal-400 text-sm flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
-              {exportStatus}
-            </span>
-
+          </dl>
+          <progress class="course-progress" aria-label="Course completed" max="100" value={progressPercent}></progress>
+          <p class="mt-2 text-sm text-slate-400">{completedNodes} of {courseTopics.length} topics</p>
+          {#if weeklyStats.some(stat => stat.minutes > 0)}
+            <h3 class="mt-5 text-sm font-semibold">Focus time this week</h3>
+            <ul class="mt-3 grid grid-cols-7 gap-1" aria-label="Weekly minutes studied" role="list">
+              {#each weeklyStats as stat}
+                <li class="flex min-w-0 flex-col items-center gap-1 text-xs text-slate-300">
+                  <span>{stat.minutes}m</span>
+                  <span class="flex h-14 w-full items-end rounded-sm bg-slate-800" aria-hidden="true">
+                    <span class="w-full rounded-sm bg-teal-400"
+                      style:height={stat.minutes * 100 / peakMinutes + '%'}></span>
+                  </span>
+                  <span>{stat.day_name}</span>
+                </li>
+              {/each}
+            </ul>
+          {:else if weeklyStats.length}
+            <p class="mt-4 text-sm text-slate-400">No focus time logged this week.</p>
           {/if}
-        </div>
-      </div>
-    </section>
-
-    <!-- Right Column: Lexicon Bank -->
-    <section class="min-w-0 lg:col-span-3 bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-xl flex flex-col lg:max-h-full lg:overflow-hidden">
-      <h2 class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-800 pb-2 flex justify-between items-center">
-        Technical Lexicon
-        <span class="bg-slate-800 text-slate-300 text-xs px-2 py-0.5 rounded-full">{vocabularies.length} terms</span>
-      </h2>
-      
-      <!-- Add New Term -->
-      <div class="bg-slate-950 border border-slate-800 rounded-lg p-3 mb-4 shrink-0">
-        <input type="text" bind:value={newTerm} placeholder="Risk Term (e.g. LGD)" class="w-full bg-transparent border-b border-slate-800 text-sm text-slate-200 px-1 py-2 mb-2 focus:border-teal-500 outline-none">
-        <textarea bind:value={newDef} rows="2" placeholder="English definition/circumlocution..." class="w-full bg-transparent text-sm text-slate-300 px-1 py-1 focus:outline-none resize-none mb-2"></textarea>
-        <div class="flex justify-between items-center">
-          <div class="flex gap-2">
-            <button class="text-xs bg-slate-800 hover:bg-slate-700 text-white px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50" on:click={addVocab} disabled={isAskingAI}>+ Add Term</button>
-            <button class="text-xs bg-fuchsia-900/50 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1" on:click={askAIVocab} disabled={!aiEnabled || isAskingAI || !newTerm.trim()}>
-              {#if isAskingAI}
-                <svg class="animate-spin h-3 w-3 text-fuchsia-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Asking AI...
-              {:else}
-                🤖 Ask AI
-              {/if}
-            </button>
-          </div>
-          {#if vocabStatus} <span class="text-teal-400 text-xs truncate max-w-[80px]">{vocabStatus}</span> {/if}
-        </div>
-      </div>
-
-      <div class="flex justify-between items-center mb-2 px-1">
-        <span class="text-xs text-slate-500 font-bold uppercase">Saved Lexicon</span>
-        <button class="text-[10px] bg-slate-800 hover:bg-teal-700 text-teal-400 hover:text-white px-2 py-1 rounded cursor-pointer transition-colors flex items-center gap-1 disabled:opacity-50" on:click={exportVocabPDF} disabled={isExportingPDF || vocabularies.length === 0}>
-          {#if isExportingPDF}
-            <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-          {:else}
-            🖨️
+          {#if sessionStats.last_topic}
+            <p class="mt-4 wrap-anywhere border-t border-slate-700 pt-3 text-sm text-slate-300">
+              Last studied · {topicNames[sessionStats.last_topic] || sessionStats.last_topic}
+            </p>
           {/if}
-          Export PDF
-        </button>
-      </div>
-
-      <!-- Lexicon List (Scrollable) -->
-      <div class="overflow-y-auto pr-2 custom-scrollbar flex-1 flex flex-col gap-3">
-        {#if vocabularies.length === 0}
-          <div class="text-center text-slate-600 text-sm mt-4 italic">No terms added yet.</div>
-        {/if}
-        {#each vocabularies as v}
-          <div class="bg-slate-800/40 border border-slate-800 rounded-lg p-3 group hover:border-slate-700 transition-colors">
-            <h3 class="font-bold text-teal-400 text-sm mb-1 group-hover:text-teal-300">{v.term}</h3>
-            <p class="text-slate-400 text-xs leading-relaxed">{v.definition}</p>
+        </section>
+        <details class="ui-card ui-details">
+          <summary class="ui-title">Course syllabus</summary>
+          {#if progressStatus}<p role="alert" class="mt-2 text-sm text-rose-200">{progressStatus}</p>{/if}
+          <div class="mt-2 grid gap-1">
+            {#each syllabusData as block, blockIndex (block.id)}
+              <button type="button" class="ui-button ui-quiet w-full justify-start text-left"
+                aria-expanded={!!expandedBlocks[block.id]} aria-controls={'module-' + blockIndex}
+                on:click={() => toggleBlock(block.id)}>{block.name}</button>
+              <div id={'module-' + blockIndex} hidden={!expandedBlocks[block.id]} class="ml-3 border-l border-slate-700 pl-2">
+                {#each block.children as chapter, chapterIndex (chapter.id)}
+                  {#if chapter.children.length}
+                    <button type="button" class="ui-button ui-quiet w-full justify-start text-left"
+                      aria-expanded={!!expandedChapters[chapter.id]} aria-controls={'chapter-' + blockIndex + '-' + chapterIndex}
+                      on:click={() => toggleChapter(chapter.id)}>{chapter.name}</button>
+                  {/if}
+                  <div id={'chapter-' + blockIndex + '-' + chapterIndex} hidden={chapter.children.length && !expandedChapters[chapter.id]}>
+                    {#each chapter.children.length ? chapter.children : [chapter] as item (item.id)}
+                      <label class="flex min-h-11 cursor-pointer items-center gap-2 py-2 text-sm text-slate-300">
+                        <input type="checkbox" class="size-4 shrink-0 accent-teal-400" checked={!!progressMap[item.id]}
+                          disabled={pendingProgress.has(item.id)} on:change={() => toggleNode(item.id)} />
+                        {item.name}
+                      </label>
+                    {/each}
+                  </div>
+                {/each}
+              </div>
+            {/each}
           </div>
-        {/each}
-      </div>
-    </section>
-
-  </div>
-
-  <!-- ============================================== -->
-  <!-- RESIZABLE PDF READING MODE                     -->
-  <!-- ============================================== -->
+        </details>
+        {@render lexicon()}
+      </aside>
+    </div>
   {:else}
-  
+  {#if !headerVisible}<h1 class="sr-only">Credit risk library</h1>{/if}
   <div class="flex flex-1 min-h-0 lg:overflow-hidden relative z-10 w-full" style:z-index={readerExpanded ? 60 : undefined}>
     <!-- Reading Mode Layout -->
     {#if appMode === 'reading'}
@@ -1453,7 +1189,7 @@
           <div class="flex flex-wrap gap-1 rounded-lg border border-slate-800 p-0.5" role="group" aria-label="Credit risk books">
             {#each Object.entries(bookTitles) as [book, title]}
               {#if books?.[book]}
-                <button type="button" class="min-h-11 rounded-md px-3 py-2 text-sm text-slate-200 aria-pressed:bg-teal-950 aria-pressed:font-semibold aria-pressed:text-teal-200"
+                <button type="button" class="ui-button ui-quiet aria-pressed:bg-teal-950 aria-pressed:font-semibold aria-pressed:text-teal-200"
                   aria-pressed={selectedBook === book} on:click={() => {
                     currentBook = book;
                     browserPdfStatus = '';
@@ -1463,30 +1199,34 @@
           </div>
           {/if}
           {#if selectedBook && nativePdfAvailable}
-            <button type="button" class="min-h-11 rounded-lg border px-3 py-2 text-sm {desktopReading
-              ? 'border-teal-500 bg-teal-400 font-semibold text-slate-950 hover:bg-teal-300'
-              : 'border-slate-700 text-slate-200 hover:bg-slate-800'}"
+            <button type="button" class="ui-button" class:ui-primary={desktopReading}
               on:click={switchPdfReader}>{desktopReading ? 'Study reader' : 'Browser PDF'}</button>
           {/if}
-          <button type="button" class="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-200 hover:bg-slate-800"
+          <button type="button" class="ui-button"
             bind:this={notesButton} aria-expanded={showCompanion} aria-controls={showCompanion ? 'reading-companion' : undefined}
             on:click={() => setReadingNotes(!showCompanion)}>
             {showCompanion ? 'Hide reading notes' : 'Reading notes'}
           </button>
           {#if compactReading}
-            {#if selectedBook}
-              <a class="rounded-lg border border-slate-700 px-3 py-2 text-sm text-teal-300"
-                href={pdfUrl + '#page=' + bookPages[selectedBook]} target="_blank" rel="noopener">Open PDF tab</a>
-              {#if desktopReading && browserFullscreenAvailable}
-                <button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-sm"
-                  on:click={showBrowserPdfFullscreen}>Full screen</button>
+            <div class="ui-actions reader-controls ml-auto" role="group" aria-label="Reader controls">
+              {#if !headerVisible}
+                <button type="button" class="ui-button ui-quiet" aria-haspopup="dialog" on:click={openAssistant}>AI Assistant</button>
+                {@render timer(true)}
               {/if}
-            {/if}
-            <button type="button" class="ml-auto rounded-lg border border-slate-700 px-3 py-2 text-sm"
-              aria-expanded={showReadingHeader} aria-controls={showReadingHeader ? 'tracker-header' : undefined}
-              on:click={() => showReadingHeader = !showReadingHeader}>
-              {showReadingHeader ? 'Hide header' : 'Show header'}
-            </button>
+              {#if selectedBook}
+                <a class="ui-button ui-quiet"
+                  href={pdfUrl + '#page=' + bookPages[selectedBook]} target="_blank" rel="noopener">Open PDF tab</a>
+                {#if desktopReading && browserFullscreenAvailable}
+                  <button type="button" class="ui-button ui-quiet"
+                    on:click={showBrowserPdfFullscreen}>Full screen</button>
+                {/if}
+              {/if}
+              <button type="button" class="ui-button ui-quiet"
+                aria-expanded={showReadingHeader} aria-controls={showReadingHeader ? 'tracker-header' : undefined}
+                on:click={() => showReadingHeader = !showReadingHeader}>
+                {showReadingHeader ? 'Hide header' : 'Show header'}
+              </button>
+            </div>
           {/if}
         </div>
         {#if browserPdfStatus && desktopReading}
@@ -1528,7 +1268,7 @@
         style:--companion-width="{companionWidth}px">
         <div class="mb-3 flex shrink-0 items-center justify-between gap-2 border-b border-slate-800 pb-2">
           <h2 id="companion-title" class="text-base font-semibold text-slate-100">Reading Companion</h2>
-          <button type="button" class="min-h-11 rounded-lg border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
+          <button type="button" class="ui-button ui-quiet"
             on:click={() => setReadingNotes(false)}><span class="lg:hidden">Back to PDF</span><span class="hidden lg:inline">Close notes</span></button>
         </div>
         
@@ -1537,144 +1277,81 @@
             topicId={selectedTopic || 'General'} topicLabel={topicNames[selectedTopic] || selectedTopic || 'Credit risk'}
             book={selectedBook || 'anderson'} page={desktopReading ? null : bookPages[selectedBook]} />
 
-          <!-- Vocab Catcher -->
-          <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700">
-            <h3 class="text-xs font-bold text-teal-400 mb-2">⚡ Quick Vocab Catcher</h3>
-            <p class="text-[10px] text-slate-400 mb-3 leading-relaxed">Found a new technical word? Save it directly to your Lexicon Bank.</p>
-            <input type="text" bind:value={newTerm} placeholder="Risk Term (e.g. PD, LGD)" class="w-full bg-slate-950 border border-slate-800 text-xs text-slate-200 px-2 py-2 rounded mb-2 focus:border-teal-500 outline-none">
-            <textarea bind:value={newDef} rows="2" placeholder="Translation or Definition..." class="w-full bg-slate-950 border border-slate-800 text-xs text-slate-300 px-2 py-2 rounded focus:outline-none resize-none mb-2 custom-scrollbar"></textarea>
-            <div class="flex justify-between items-center gap-2">
-              <div class="flex gap-2">
-                <button class="text-xs bg-teal-600 hover:bg-teal-500 text-slate-950 font-bold px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50" on:click={addVocab} disabled={isAskingAI}>Save to Lexicon</button>
-                <button class="text-xs bg-fuchsia-900/50 hover:bg-fuchsia-800 text-fuchsia-300 px-3 py-1.5 rounded cursor-pointer transition-colors disabled:opacity-50 flex items-center gap-1" on:click={askAIVocab} disabled={!aiEnabled || isAskingAI || !newTerm.trim()}>
-                  {#if isAskingAI}
-                    <svg class="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                  {:else}
-                    🤖 Ask AI
-                  {/if}
-                </button>
-              </div>
-              {#if vocabStatus} <span class="text-teal-400 text-[10px] truncate max-w-[80px]">{vocabStatus}</span> {/if}
-            </div>
+          {@render lexicon()}
 
-            <!-- Saved Vocabularies -->
-            {#if vocabularies.length > 0}
-              <div class="mt-3 flex flex-col gap-2 max-h-[200px] overflow-y-auto custom-scrollbar pr-1 border-t border-slate-700 pt-3">
-                {#each vocabularies as v}
-                  <div class="bg-slate-900 border border-slate-800 p-2 rounded flex justify-between items-start group">
-                    <div class="flex flex-col gap-1 flex-1">
-                      <span class="text-[11px] font-bold text-teal-400">{v.term}</span>
-                      <span class="text-[10px] text-slate-300 leading-relaxed">{v.definition}</span>
-                    </div>
-                    <button class="text-slate-500 hover:text-teal-400 transition-colors p-1" on:click={() => playAudio(v.term)} title="Play Pronunciation">
-                      🔊
-                    </button>
-                  </div>
-                {/each}
-              </div>
-            {/if}
-          </div>
-
-          <details class="rounded-lg border border-slate-700 p-2">
-            <summary class="cursor-pointer text-xs text-slate-200">Other reading tools</summary>
-          <div class="bg-slate-800/50 rounded-lg p-3 border border-slate-700 flex flex-col flex-1">
-            <h3 class="text-xs font-bold text-amber-200 mb-2">Reading note</h3>
-            
-            <textarea bind:value={doubtContent} on:paste={handlePaste} class="flex-1 w-full min-h-[150px] bg-slate-950 border border-slate-800 text-xs text-slate-300 px-2 py-2 rounded focus:border-amber-500 outline-none resize-none mb-3 custom-scrollbar" placeholder={subscriptionAI ? "Paste a sentence from the book…" : "Paste a sentence or an image from the book…"}></textarea>
-            
+          <details class="ui-card ui-details p-3">
+            <summary class="ui-title">Other reading tools</summary>
+          <div class="pt-2">
+            <label class="ui-label">Reading note
+              <textarea bind:value={doubtContent} on:paste={handlePaste} rows="4" class="ui-input"
+                placeholder={subscriptionAI ? "Paste a sentence from the book…" : "Paste a sentence or an image from the book…"}></textarea>
+            </label>
             {#if doubtImageBase64}
-              <div class="relative inline-block mb-3 bg-slate-900 border border-slate-700 p-1 rounded max-w-fit">
-                <img src={doubtImageBase64} alt="Pasted snapshot" class="max-h-[100px] object-contain rounded" />
-                <button class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold hover:bg-rose-400 border-2 border-slate-800" on:click={() => doubtImageBase64 = null}>×</button>
+              <div class="mt-3 flex flex-wrap items-center gap-2">
+                <img src={doubtImageBase64} alt="Pasted snapshot" class="max-h-28 max-w-full rounded object-contain" />
+                <button type="button" class="ui-button" on:click={() => doubtImageBase64 = null}>Remove image</button>
               </div>
             {/if}
-            <div class="flex flex-col gap-2">
-              <div class="flex gap-2">
-                <button class="text-[10px] flex-1 font-bold bg-sky-600 hover:bg-sky-500 text-slate-950 px-2 py-2 rounded cursor-pointer transition-colors uppercase tracking-wider flex items-center justify-center gap-1" on:click={() => translateDoubt('quick')} disabled={!onlineHelpers || !doubtContent.trim() || isTranslating}>
-                  {#if isTranslating && translateMode === 'quick'}
-                    <svg class="animate-spin h-3 w-3 text-slate-950" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Translating...
-                  {:else}
-                    ⚡ Quick ID
-                  {/if}
+            <div class="ui-actions mt-3">
+              {#if onlineHelpers}
+                <button type="button" class="ui-button" on:click={() => translateDoubt('quick')} disabled={!doubtContent.trim() || isTranslating}>
+                  {isTranslating && translateMode === 'quick' ? 'Translating…' : 'Translate to Indonesian'}
                 </button>
-
-                <button class="text-[10px] flex-1 font-bold bg-indigo-600 hover:bg-indigo-500 text-slate-100 px-2 py-2 rounded cursor-pointer transition-colors uppercase tracking-wider flex items-center justify-center gap-1" on:click={() => translateDoubt('comprehensive')} disabled={!onlineHelpers || !doubtContent.trim() || isTranslating}>
-                  {#if isTranslating && translateMode === 'comprehensive'}
-                    <svg class="animate-spin h-3 w-3 text-slate-100" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                    Deep Scan...
-                  {:else}
-                    🔍 Comprehensive
-                  {/if}
+                <button type="button" class="ui-button" on:click={() => translateDoubt('comprehensive')} disabled={!doubtContent.trim() || isTranslating}>
+                  {isTranslating && translateMode === 'comprehensive' ? 'Analyzing…' : 'Detailed translation'}
                 </button>
-              </div>
-
-              <button class="text-[10px] font-bold bg-fuchsia-600 hover:bg-fuchsia-500 text-white px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider flex items-center justify-center gap-1 shadow-[0_0_10px_rgba(192,38,211,0.5)] disabled:opacity-50 disabled:cursor-not-allowed" on:click={explainDoubt} disabled={!aiEnabled || (!doubtContent.trim() && !doubtImageBase64) || isExplaining}>
-                {#if isExplaining}
-                  <svg class="animate-spin h-3 w-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                  Thinking...
-                {:else}
-                  🪄 Magic Explain (ELI5)
-                {/if}
-              </button>
-              
-              <button class="text-[10px] font-bold bg-amber-600 hover:bg-amber-500 text-slate-950 px-3 py-2 rounded cursor-pointer transition-colors w-full uppercase tracking-wider" on:click={submitDoubt} disabled={!doubtContent.trim() || savingDoubt}>Save question to journal</button>
-              
-              {#if doubtStatus} <span class="text-amber-400 text-[10px] text-center mt-1">{doubtStatus}</span> {/if}
+              {/if}
+              {#if aiEnabled}
+                <button type="button" class="ui-button" on:click={explainDoubt} disabled={(!doubtContent.trim() && !doubtImageBase64) || isExplaining}>
+                  {isExplaining ? 'Preparing…' : 'Explain note'}
+                </button>
+              {/if}
+              <button type="button" class="ui-button ui-primary" on:click={submitDoubt} disabled={!doubtContent.trim() || savingDoubt}>Save question to journal</button>
             </div>
+            {#if doubtStatus}<p role="status" class="mt-2 text-sm text-slate-300">{doubtStatus}</p>{/if}
 
-            <!-- Beautiful Explain Result UI -->
             {#if explainResult}
-              <div class="mt-4 p-4 bg-fuchsia-950/20 border border-fuchsia-800 rounded-lg shadow-[0_0_15px_rgba(192,38,211,0.1)] flex flex-col gap-3">
-                <div>
-                  <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1 mb-1">🎯 Core Concept (ID)</span>
-                  <div class="text-[11px] text-slate-200 leading-relaxed markdown-body">{@html renderMarkdown(explainResult.core_concept)}</div>
-                </div>
-                <div>
-                  <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1 mb-1">💡 Practical Example (ID)</span>
-                  <div class="text-[11px] text-slate-300 leading-relaxed bg-amber-950/30 p-2 rounded border-l-2 border-amber-500 markdown-body">{@html renderMarkdown(explainResult.practical_example)}</div>
-                </div>
-                <div>
-                  <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1 mb-1">🧠 Smart Analogy</span>
-                  <div class="text-[11px] text-slate-300 leading-relaxed bg-emerald-950/30 p-2 rounded border-l-2 border-emerald-500 markdown-body">{@html renderMarkdown(explainResult.analogy)}</div>
-                </div>
-                <div>
-                  <span class="text-[10px] font-bold text-fuchsia-400 uppercase tracking-wider flex items-center gap-1 mb-1">💬 English Explanation</span>
-                  <div class="text-[11px] text-slate-300 leading-relaxed italic bg-fuchsia-900/30 p-2 rounded border-l-2 border-fuchsia-500 markdown-body">{@html renderMarkdown(explainResult.english_explanation)}</div>
-                </div>
-                <div>
-                  <span class="text-[10px] font-bold text-teal-400 uppercase tracking-wider flex items-center gap-1 mb-1">🔍 Phrasing Breakdown</span>
-                  <div class="text-[11px] text-slate-300 leading-relaxed bg-teal-900/30 p-2 rounded border-l-2 border-teal-500 markdown-body">{@html renderMarkdown(explainResult.phrasing_breakdown)}</div>
-                </div>
-              </div>
+              <dl class="mt-4 grid gap-3 rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm leading-relaxed">
+                {#each [
+                  ['Core concept in Indonesian', explainResult.core_concept],
+                  ['Practical example in Indonesian', explainResult.practical_example],
+                  ['Analogy', explainResult.analogy],
+                  ['Explanation in English', explainResult.english_explanation],
+                  ['Useful phrases', explainResult.phrasing_breakdown],
+                ] as [label, value]}
+                  {#if value}
+                    <div>
+                      <dt class="font-semibold text-teal-300">{label}</dt>
+                      <dd class="markdown-body text-slate-200">{@html renderMarkdown(value)}</dd>
+                    </div>
+                  {/if}
+                {/each}
+              </dl>
             {/if}
 
-            <!-- Beautiful Translation Result UI -->
             {#if translateResult}
-              <div class="mt-4 p-3 bg-slate-900 border border-slate-700 rounded-lg shadow-inner max-h-[300px] overflow-y-auto custom-scrollbar">
-                <div class="mb-3">
-                  <div class="flex items-center justify-between mb-1">
-                    <span class="text-[10px] font-bold text-sky-400 uppercase tracking-wider">Terjemahan Indonesia:</span>
-                    <button class="text-[10px] text-slate-400 hover:text-teal-400 transition-colors flex items-center gap-1 cursor-pointer" on:click={() => playAudio(doubtContent)} title="Listen Original English">🔊 Original</button>
+              <section aria-label="Translation result" class="mt-4 grid gap-4 rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm leading-relaxed">
+                <div>
+                  <div class="flex flex-wrap items-center justify-between gap-1">
+                    <h3 class="font-semibold text-teal-300">Indonesian translation</h3>
+                    <button type="button" class="ui-button ui-quiet" on:click={() => playAudio(doubtContent)}>Listen to original</button>
                   </div>
-                  <p class="text-xs text-slate-200 mt-1 leading-relaxed bg-slate-800/50 p-2 rounded">{translateResult.translation}</p>
+                  <p class="whitespace-pre-wrap wrap-anywhere">{translateResult.translation}</p>
                 </div>
-
-                {#if translateResult.dictionary && translateResult.dictionary.length > 0}
-                  <div class="mb-3">
-                    <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">📖 General Dictionary</span>
-                    {#each translateResult.dictionary as dict}
-                      <div class="mt-2 bg-slate-800 p-2 rounded border-l-2 border-emerald-500">
-                        <div class="flex items-center gap-2 mb-1">
-                          <p class="text-sm font-bold text-slate-200">{dict.word} <span class="text-xs font-normal text-slate-400">{dict.phonetic}</span></p>
-                          <button class="text-slate-400 hover:text-teal-400 transition-colors p-0.5 cursor-pointer" on:click={() => playAudio(dict.word)} title="Listen">🔊</button>
+                {#if translateResult.dictionary?.length}
+                  <div class="grid gap-3">
+                    <h3 class="font-semibold text-teal-300">Dictionary</h3>
+                    {#each translateResult.dictionary as entry}
+                      <div class="border-l-2 border-slate-700 pl-3">
+                        <div class="flex flex-wrap items-center justify-between gap-1">
+                          <p class="wrap-anywhere font-medium">{entry.word} <span class="text-slate-400">{entry.phonetic}</span></p>
+                          <button type="button" class="ui-button ui-quiet" aria-label={'Listen to ' + entry.word} on:click={() => playAudio(entry.word)}>Listen</button>
                         </div>
-                        <ul class="mt-1 list-disc list-inside text-xs text-slate-300">
-                          {#each dict.meanings as meaning}
-                            <li class="mb-1"><span class="italic text-emerald-400">({meaning.pos})</span> {meaning.def}
-                              {#if meaning.ex}
-                                <br><span class="text-slate-500 ml-4">"{meaning.ex}"</span>
-                              {/if}
+                        <ul class="list-disc space-y-1 pl-5">
+                          {#each entry.meanings as meaning}
+                            <li class="wrap-anywhere">
+                              <em class="text-teal-300">{meaning.pos}</em> {meaning.def}
+                              {#if meaning.ex}<p class="text-slate-400">{meaning.ex}</p>{/if}
                             </li>
                           {/each}
                         </ul>
@@ -1682,26 +1359,25 @@
                     {/each}
                   </div>
                 {/if}
-
-                {#if translateResult.glossary && translateResult.glossary.length > 0}
-                  <div>
-                    <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1">🧠 Credit Risk Context</span>
-                    {#each translateResult.glossary as gloss}
-                      <div class="mt-2 bg-indigo-950/30 p-2 rounded border-l-2 border-indigo-500">
-                        <div class="flex items-center gap-2 mb-1">
-                          <p class="text-sm font-bold text-indigo-300">{gloss.term}</p>
-                          <button class="text-indigo-400 hover:text-teal-400 transition-colors p-0.5 cursor-pointer" on:click={() => playAudio(gloss.term)} title="Listen">🔊</button>
+                {#if translateResult.glossary?.length}
+                  <div class="grid gap-3">
+                    <h3 class="font-semibold text-teal-300">Credit risk context</h3>
+                    {#each translateResult.glossary as entry}
+                      <div class="border-l-2 border-slate-700 pl-3">
+                        <div class="flex flex-wrap items-center justify-between gap-1">
+                          <p class="wrap-anywhere font-medium">{entry.term}</p>
+                          <button type="button" class="ui-button ui-quiet" aria-label={'Listen to ' + entry.term} on:click={() => playAudio(entry.term)}>Listen</button>
                         </div>
-                        <div class="text-[10px] mt-1 space-y-1">
-                          <p><span class="text-slate-400 font-semibold w-16 inline-block">General:</span> <span class="text-slate-300">{gloss.general}</span></p>
-                          <p><span class="text-slate-400 font-semibold w-16 inline-block">Credit:</span> <span class="text-amber-300 font-medium">{gloss.credit}</span></p>
-                          <p><span class="text-slate-400 font-semibold w-16 inline-block leading-tight">Context:</span> <span class="text-slate-300 italic">{gloss.context}</span></p>
-                        </div>
+                        <dl class="grid gap-1 wrap-anywhere">
+                          <div><dt class="font-medium">General meaning</dt><dd class="text-slate-300">{entry.general}</dd></div>
+                          <div><dt class="font-medium">Credit risk meaning</dt><dd class="text-slate-300">{entry.credit}</dd></div>
+                          <div><dt class="font-medium">In this passage</dt><dd class="text-slate-300">{entry.context}</dd></div>
+                        </dl>
                       </div>
                     {/each}
                   </div>
                 {/if}
-              </div>
+              </section>
             {/if}
           </div>
           </details>
@@ -1715,130 +1391,135 @@
 </div>
 {/if}
 
-  <!-- ============================================== -->
-  <!-- FLOATING CHATBOT WIDGET                        -->
-  <!-- ============================================== -->
 
-  <div class="fixed bottom-6 right-6 z-[100] cursor-grab active:cursor-grabbing" use:draggable
-    hidden={hideReadingOverlay} inert={hideReadingOverlay}>
-    <button 
-      class="bg-gradient-to-r from-teal-500 to-sky-500 text-white p-4 rounded-full shadow-[0_0_20px_rgba(20,184,166,0.4)] hover:shadow-[0_0_25px_rgba(20,184,166,0.6)] hover:scale-105 transition-all cursor-pointer border-2 border-slate-900 group flex items-center gap-2"
-      aria-label="English AI Assistant" aria-expanded={isChatOpen}
-      on:click={() => { isChatOpen = !isChatOpen; if(isChatOpen) scrollToBottom(); }}
-    >
-      <span class="text-white/60 mr-1">⠿</span>
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" /></svg>
-      {#if !isChatOpen}
-        <span class="max-w-0 overflow-hidden group-hover:max-w-xs transition-all duration-300 ease-in-out whitespace-nowrap font-bold text-sm">Ask AI Assistant</span>
-      {/if}
-    </button>
-  </div>
+  </main>
 
-  {#if isChatOpen}
-    <div hidden={hideReadingOverlay} inert={hideReadingOverlay} class="fixed {isChatMaximized ? 'inset-4 md:inset-10 z-[200] w-auto h-auto' : 'bottom-24 right-6 z-[100] w-80 md:w-96'} bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300" style="{isChatMaximized ? '' : 'height: 500px; max-height: calc(100vh - 120px);'}">
-      <!-- Header -->
-      <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-4 border-b border-slate-700 flex justify-between items-center shrink-0">
-        <div class="flex items-center gap-2">
-          <div class="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></div>
-          <span class="font-bold text-slate-200 text-sm">English AI Assistant</span>
-        </div>
-        <div class="flex items-center gap-3">
-          {#if subscriptionAI}
-            <button type="button" class="text-xs text-teal-300" on:click={() => {
+  <dialog class="ui-dialog max-w-md" bind:this={timerDialog} on:close={() => timerSettingsOpen = false} aria-labelledby="timer-dialog-title">
+    <div class="ui-dialog-header">
+      <h2 class="ui-dialog-title" id="timer-dialog-title">Study timer</h2>
+      <button type="button" class="ui-button ui-quiet" on:click={() => timerDialog.close()}>Close</button>
+    </div>
+    <p class="mt-4 text-sm text-slate-300">Stage · {timerActive || elapsedSessionSeconds ? activeTimerPillar : appMode === 'reading' ? 'Reading Comprehension' : pillars[currentPillarIndex]}</p>
+    <form class="mt-4 flex flex-wrap items-end gap-2" on:submit|preventDefault={setTimer}>
+      <label class="ui-label">Duration in minutes
+        <input class="ui-input" type="number" bind:value={customMinutes} min="1" max="120" step="1" required
+          disabled={timerActive || savingSession} />
+      </label>
+      <button class="ui-button" disabled={timerActive || savingSession || elapsedSessionSeconds > 0}>Set duration</button>
+    </form>
+    {#if elapsedSessionSeconds > 0}
+      <p class="mt-2 text-sm text-slate-400">Save or reset the current session to change the duration.</p>
+    {/if}
+    <div class="ui-actions mt-4">
+      <button type="button" class="ui-button ui-primary" on:click={logStudySession} disabled={elapsedSessionSeconds < 60 || savingSession}>
+        {savingSession ? 'Saving…' : 'Stop & Save'}
+      </button>
+      <button type="button" class="ui-button" on:click={resetTimer} disabled={savingSession}>Reset timer</button>
+      <button type="button" class="ui-button" on:click={nextPillar}
+        disabled={currentPillarIndex === pillars.length - 1 || savingSession || appMode === 'reading'}>Next Stage</button>
+    </div>
+    {#if sessionStatus && timerSettingsOpen}<p role="status" class="mt-3 text-sm text-slate-200">{sessionStatus}</p>{/if}
+  </dialog>
+
+  <dialog bind:this={assistantDialog} class="ui-dialog assistant-dialog" class:assistant-wide={isChatMaximized} aria-labelledby="assistant-title">
+    <div class="ui-dialog-header shrink-0">
+      <h2 class="ui-dialog-title" id="assistant-title">English AI Assistant</h2>
+      <div class="ui-actions">
+        {#if subscriptionAI}
+          <button type="button" class="ui-button ui-quiet" aria-expanded={showAISettings}
+            aria-controls={showAISettings ? 'assistant-settings' : undefined} on:click={() => {
               showAISettings = !showAISettings;
               if (showAISettings) loadAISettings();
             }}>AI settings</button>
-          {/if}
-          <button class="text-slate-400 hover:text-white transition-colors cursor-pointer" on:click={() => isChatMaximized = !isChatMaximized} title={isChatMaximized ? "Minimize" : "Maximize"}>
-            {#if isChatMaximized}
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 14h6v6m10-10h-6V4m0 10l6 6M4 4l6 6" /></svg>
-            {:else}
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
-            {/if}
-          </button>
-          <button class="text-slate-400 hover:text-white transition-colors cursor-pointer" on:click={() => isChatOpen = false}>
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
-          </button>
-        </div>
-      </div>
-      
-      {#if showAISettings && subscriptionAI}
-        <form class="space-y-2 border-b border-slate-700 p-3 text-xs text-slate-200" on:submit|preventDefault={saveAISettings}>
-          <div class="grid grid-cols-2 gap-2">
-            <label class="min-w-0">AI provider
-              <select aria-label="AI provider" class="mt-1 w-full rounded bg-slate-800 p-2" bind:value={aiProvider}
-                on:change={() => loadAISettings(aiProvider)} disabled={aiSettingsBusy}>
-                <option value="codex">Codex</option>
-                <option value="claude">Claude Code</option>
-                <option value="gemini" disabled>Gemini · setup pending</option>
-              </select>
-            </label>
-            <label class="min-w-0">AI model
-              <select aria-label="AI model" class="mt-1 w-full rounded bg-slate-800 p-2" bind:value={aiModel} disabled={aiSettingsBusy}>
-                {#each aiModels as model (model)}
-                  <option value={model}>{model}</option>
-                {/each}
-              </select>
-            </label>
-          </div>
-          {#if activeAI}<p class="text-slate-400">Active model {activeAI.model}</p>{/if}
-          <button type="submit" class="rounded bg-teal-400 px-3 py-1.5 font-semibold text-slate-950 disabled:opacity-50"
-            disabled={aiSettingsBusy || !aiModel}>Save AI preferences</button>
-          {#if aiSettingsStatus}<p role="status">{aiSettingsStatus}</p>{/if}
-        </form>
-      {/if}
-
-      <!-- Messages -->
-      <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar bg-slate-950" bind:this={chatContainer}>
-        {#if chatMessages.length === 0}
-          <div class="text-center mt-10">
-            <div class="text-4xl mb-3">👋</div>
-            <h3 class="text-slate-300 font-bold mb-1">Hi there!</h3>
-            <p class="text-xs text-slate-500">I can help you understand grammar, explain difficult concepts, or translate phrases. What's on your mind?</p>
-          </div>
         {/if}
-        {#each chatMessages as msg}
-          <div class="flex flex-col {msg.role === 'user' ? 'items-end' : 'items-start'}">
-            <span class="text-[9px] text-slate-500 font-bold uppercase mb-1 px-1">{msg.role === 'user' ? 'You' : 'AI Assistant'}</span>
-            <div class="p-3 rounded-2xl max-w-[85%] text-[13px] leading-relaxed shadow-sm {msg.role === 'user' ? 'whitespace-pre-wrap bg-teal-600 text-white rounded-tr-sm' : 'markdown-body bg-slate-800 text-slate-200 border border-slate-700 rounded-tl-sm'}">
-              {#if msg.role === 'assistant'}
-                {@html renderMarkdown(msg.content)}
-              {:else}
-                {msg.content}
-              {/if}
-            </div>
-          </div>
-        {/each}
-        {#if isChatLoading && (!chatMessages.length || chatMessages[chatMessages.length - 1].role !== 'assistant')}
-          <div class="flex flex-col items-start">
-            <div class="p-4 rounded-2xl bg-slate-800 border border-slate-700 rounded-tl-sm flex gap-1 items-center">
-              <div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce"></div>
-              <div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-              <div class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-            </div>
-          </div>
-        {/if}
-      </div>
-      
-      <!-- Input -->
-      <div class="p-3 bg-slate-900 border-t border-slate-700 shrink-0">
-        <form class="flex gap-2" on:submit|preventDefault={sendChatMessage}>
-          <input 
-            type="text" 
-            bind:value={chatInput} 
-            placeholder="Ask something..." 
-            class="flex-1 bg-slate-800 text-slate-200 text-sm rounded-xl px-4 py-2 border border-slate-700 focus:border-teal-500 focus:outline-none placeholder-slate-500 disabled:opacity-50"
-            disabled={!aiEnabled || isChatLoading}
-          >
-          <button 
-            type="submit" 
-            class="bg-teal-500 hover:bg-teal-400 text-slate-950 p-2.5 rounded-xl cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shrink-0"
-            disabled={!aiEnabled || !chatInput.trim() || isChatLoading}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-          </button>
-        </form>
+        <button type="button" class="ui-button ui-quiet" aria-haspopup="dialog" on:click={openInteractionsModal}>History</button>
+        <button type="button" class="ui-button ui-quiet hidden sm:inline-flex" on:click={() => isChatMaximized = !isChatMaximized}>
+          {isChatMaximized ? 'Shrink' : 'Expand'}
+        </button>
+        <button type="button" class="ui-button ui-quiet" on:click={() => assistantDialog.close()}>Close</button>
       </div>
     </div>
-  {/if}
-</main>
+    {#if showAISettings && subscriptionAI}
+      <form id="assistant-settings" class="shrink-0 space-y-3 border-b border-slate-700 py-4" on:submit|preventDefault={saveAISettings}>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="ui-label">AI provider
+            <select aria-label="AI provider" class="ui-input" bind:value={aiProvider} on:change={() => loadAISettings(aiProvider)} disabled={aiSettingsBusy}>
+              <option value="codex">Codex</option>
+              <option value="claude">Claude Code</option>
+              <option value="gemini" disabled>Gemini · setup pending</option>
+            </select>
+          </label>
+          <label class="ui-label">AI model
+            <select aria-label="AI model" class="ui-input" bind:value={aiModel} disabled={aiSettingsBusy}>
+              {#each aiModels as model (model)}<option value={model}>{model}</option>{/each}
+            </select>
+          </label>
+        </div>
+        {#if activeAI}<p class="wrap-anywhere text-sm text-slate-300">Active model · {activeAI.model}</p>{/if}
+        <button class="ui-button ui-primary" disabled={aiSettingsBusy || !aiModel}>Save AI preferences</button>
+        {#if aiSettingsStatus}<p role="status" class="text-sm text-slate-300">{aiSettingsStatus}</p>{/if}
+      </form>
+    {/if}
+    <div class="my-3 flex min-h-0 flex-1 flex-col gap-4 overflow-auto rounded-lg bg-slate-950 p-3 sm:p-4"
+      role="log" aria-label="Conversation" aria-busy={isChatLoading} bind:this={chatContainer}>
+      {#if !chatMessages.length}
+        <p class="m-auto max-w-[32ch] text-center text-sm leading-relaxed text-slate-300">{aiEnabled ? 'Ask about a credit risk concept or paste a sentence to discuss.' : 'The AI tutor is unavailable. Your books and journal are still available.'}</p>
+      {/if}
+      {#each chatMessages as msg}
+        <article class={msg.role === 'user' ? 'ml-4 self-end' : 'mr-4 self-start'}>
+          <h3 class="mb-1 text-xs font-semibold text-slate-400">{msg.role === 'user' ? 'You' : 'Tutor'}</h3>
+          <div class="rounded-xl p-3 text-sm leading-relaxed wrap-anywhere {msg.role === 'user' ? 'whitespace-pre-wrap bg-teal-950 text-teal-100' : 'markdown-body bg-slate-800 text-slate-100'}">
+            {#if msg.role === 'assistant'}
+              {@html renderMarkdown(msg.content)}
+              {#if !msg.content && isChatLoading}<span>Preparing response…</span>{/if}
+            {:else}
+              {msg.content}
+            {/if}
+          </div>
+        </article>
+      {/each}
+    </div>
+    <form class="shrink-0" on:submit|preventDefault={sendChatMessage}>
+      <label for="assistant-message" class="text-sm font-medium">Message</label>
+      <div class="mt-1.5 flex items-end gap-2">
+        <input id="assistant-message" type="text" bind:value={chatInput} class="ui-input flex-1"
+          disabled={!aiEnabled || isChatLoading} />
+        <button type="submit" class="ui-button ui-primary" disabled={!aiEnabled || !chatInput.trim() || isChatLoading}>Send</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="ui-dialog" bind:this={historyDialog} aria-labelledby="history-title">
+    <div class="ui-dialog-header">
+      <h2 class="ui-dialog-title" id="history-title">AI history</h2>
+      <button type="button" class="ui-button ui-quiet" on:click={() => historyDialog.close()}>Close</button>
+    </div>
+    <div class="ui-label my-4 max-w-56">
+      <label for="interaction-type">Interaction type</label>
+      <select class="ui-input" id="interaction-type" bind:value={interactionsFilter}>
+        <option value="All">All types</option>
+        <option value="Chatbot">Chatbot</option>
+        <option value="Grammar">Grammar</option>
+        <option value="Explain">Explanation</option>
+      </select>
+    </div>
+    {#if isFetchingInteractions}
+      <p role="status" class="text-sm text-slate-300">Loading history…</p>
+    {:else if historyError}
+      <p role="alert" class="text-sm text-rose-200">{historyError}</p>
+    {:else}
+      <div class="grid gap-3">
+        {#each savedInteractions.filter(item => interactionsFilter === 'All' || item.interaction_type === interactionsFilter) as item}
+          <article class="rounded-lg border border-slate-700 p-4">
+            <h3 class="text-base font-semibold">{item.interaction_type}</h3>
+            <p class="mt-1 text-sm text-slate-400">{new Date(item.created_at).toLocaleString()}</p>
+            <p class="my-3 whitespace-pre-wrap wrap-anywhere border-l-2 border-slate-600 pl-3 text-sm text-slate-200">{item.input_text}</p>
+            <div class="markdown-body text-sm leading-relaxed text-slate-300">{@html renderMarkdown(item.response_text)}</div>
+          </article>
+        {:else}
+          <p class="text-sm text-slate-300">No matching interactions.</p>
+        {/each}
+      </div>
+    {/if}
+  </dialog>
+</div>

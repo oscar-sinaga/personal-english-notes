@@ -14,9 +14,9 @@
   export let page = null;
 
   const modes = { speaking: 'Speaking', listening: 'Listening', shadowing: 'Shadowing', roleplay: 'Role-play', case: 'Credit Risk Case Lab', excerpt: 'Ask about this excerpt' };
-  const button = 'rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium disabled:opacity-50';
-  const accent = 'rounded-lg bg-teal-400 px-3 py-2 text-xs font-semibold text-slate-950 disabled:opacity-50';
-  const input = 'w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-slate-100';
+  const button = 'ui-button';
+  const accent = 'ui-button ui-primary';
+  const input = 'ui-input';
   const empty = () => ({ transcript: '', audio: null, feedback: null });
   const hasTake = take => Boolean(take.transcript.trim() || take.audio);
   const reading = initialMode === 'excerpt';
@@ -97,9 +97,14 @@
     return true;
   }
 
-  export function focusExcerpt(readyToExplain = false) {
+  export function focusLesson(readyToExplain = false) {
     const target = readyToExplain && explainButton && !explainButton.disabled ? explainButton : titleElement;
-    target?.focus();
+    if (reading) {
+      target?.focus();
+    } else {
+      target?.focus({ preventScroll: true });
+      target?.scrollIntoView({ block: 'center' });
+    }
   }
 
   function post(path, json) {
@@ -257,9 +262,9 @@
   }
 </script>
 
-<section class="space-y-4 rounded-xl border border-slate-700 bg-slate-900/70 p-3 text-sm text-slate-100" aria-label={reading ? 'Book tutor' : 'Guided practice'}>
+<section class="space-y-4 rounded-xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-100" aria-label={reading ? 'Book tutor' : 'Guided practice'}>
   <div class="flex flex-wrap items-center justify-between gap-1">
-    <h3 class="font-semibold" tabindex="-1" bind:this={titleElement}>{reading ? 'Ask about this excerpt' : modes[mode]}</h3>
+    <h3 class="text-base font-semibold" tabindex="-1" bind:this={titleElement}>{reading ? 'Ask about this excerpt' : modes[mode]}</h3>
     {#if !reading && lesson}
       <span class="text-xs text-slate-400">{lessonTitle}</span>
     {/if}
@@ -281,23 +286,25 @@
           placeholder="Select text in the study reader or paste an excerpt."></textarea>
       </label>
     {:else}
-      <label class="grid max-w-sm gap-1 text-xs text-slate-300">Exercise mode
-        <select value={mode} on:change={switchMode} class={input}>
-          {#each Object.entries(modes).filter(([id]) => id !== 'excerpt') as [value, name] (value)}
-            <option {value}>{name}</option>
-          {/each}
-        </select>
-      </label>
+      {#if initialMode === 'speaking'}
+        <label class="ui-label max-w-sm">Exercise mode
+          <select aria-label="Exercise mode" value={mode} on:change={switchMode} class={input}>
+            {#each ['speaking', 'shadowing', 'roleplay'] as value (value)}
+              <option {value}>{modes[value]}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
       {#if mode === 'roleplay'}
-        <label class="grid max-w-sm gap-1 text-xs text-slate-300">Tutor role
-          <select bind:value={scenario} class={input}>
+        <label class="ui-label max-w-sm">Tutor role
+          <select aria-label="Tutor role" bind:value={scenario} class={input}>
             <option value="interviewer">Credit risk interviewer</option>
             <option value="senior-analyst">Senior risk analyst</option>
           </select>
         </label>
       {:else if mode === 'case'}
-        <label class="grid max-w-sm gap-1 text-xs text-slate-300">Case
-          <select bind:value={caseId} class={input}>
+        <label class="ui-label max-w-sm">Case
+          <select aria-label="Case" bind:value={caseId} class={input}>
             {#each cases as item (item.id)}<option value={item.id}>{item.title}</option>{/each}
           </select>
         </label>
@@ -305,7 +312,7 @@
       {/if}
     {/if}
     <div class="flex flex-wrap gap-2">
-      <button type="button" class={reading ? accent + ' min-h-11 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300' : accent}
+      <button type="button" class={accent}
         bind:this={explainButton} on:click={start}
         disabled={mode === 'case' ? !cases.length : !aiEnabled || (reading && (!sourcePage || excerpt.trim().length < MIN_BOOK_EXCERPT))}>
         {busy === 'lesson' ? 'Preparing…' : reading ? 'Explain excerpt' : mode === 'case' ? 'Open case' : 'Generate exercise'}

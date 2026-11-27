@@ -18,6 +18,7 @@
   let pdfjs;
   let renderTask;
   let textLayer;
+  let pageDraw;
   let renderId = 0;
   let live = true;
   let canvas;
@@ -79,6 +80,8 @@
     needsLogin = false;
     documentProxy = undefined;
     readyPage = 0;
+    pageDraw = undefined;
+    selectedExcerpt = '';
     try {
       await loadingTask?.destroy();
       const [library, worker] = await Promise.all([
@@ -176,11 +179,15 @@
   });
 
   async function drawPage(book, number, availableWidth, magnification, fullSize, surface, textHost) {
+    const samePage = pageDraw?.book === book && pageDraw.number === number;
+    if (samePage && pageDraw.availableWidth === availableWidth
+      && pageDraw.magnification === magnification && pageDraw.fullSize === fullSize) return;
+    if (!samePage) selectedExcerpt = '';
+    pageDraw = { book, number, availableWidth, magnification, fullSize };
     const id = ++renderId;
     renderTask?.cancel();
     textLayer?.cancel();
     readyPage = 0;
-    selectedExcerpt = '';
     try {
       const sourcePage = await book.getPage(number);
       if (!live || id !== renderId) return;
@@ -209,6 +216,7 @@
       if (live && id === renderId) readyPage = number;
     } catch (reason) {
       if (live && id === renderId && reason.name !== 'RenderingCancelledException') {
+        pageDraw = undefined;
         await reportError(reason, id);
       }
     }
@@ -257,10 +265,14 @@
     readPdfSelection();
     if (readyPage !== page || excerptError(selectedExcerpt)) return;
     if (await shareExcerpt(selectedExcerpt, page)) {
-      selectedExcerpt = '';
-      const selection = window.getSelection();
-      if (textContainer?.contains(selection?.anchorNode)) selection.removeAllRanges();
+      clearPdfSelection();
     }
+  }
+
+  function clearPdfSelection() {
+    selectedExcerpt = '';
+    const selection = window.getSelection();
+    if (textContainer?.contains(selection?.anchorNode)) selection.removeAllRanges();
   }
 
   async function openPageText() {
@@ -302,7 +314,10 @@
       return;
     }
     textDialog.close();
-    if (!(await shareExcerpt(excerpt, textPage)) && live) {
+    const accepted = await shareExcerpt(excerpt, textPage);
+    if (accepted) {
+      clearPdfSelection();
+    } else if (live) {
       textDialog.showModal();
       textField.focus();
     }
@@ -335,7 +350,7 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-800 bg-slate-900 shadow-xl"
+<section class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-900"
   class:reader-expanded={expanded} bind:this={reader} aria-label={title + ' reader'}>
   {#if expanded}
     <button type="button" class="reader-button controls-toggle" aria-controls="pdf-toolbar" aria-expanded={controlsVisible}
@@ -347,7 +362,7 @@
     hidden={expanded && !controlsVisible}>
     <button type="button" class="reader-button" on:click={() => showPage(page - 1)} disabled={!documentProxy || page <= 1}>Previous</button>
     <form class="flex items-center gap-1" on:submit|preventDefault={() => showPage(requestedPage)}>
-      <input type="number" aria-label="Page number" class="w-16 rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm"
+      <input type="number" aria-label="Page number" class="ui-input w-16 px-2"
         min="1" max={documentProxy?.numPages} bind:value={requestedPage} disabled={!documentProxy} />
       <span class="text-sm text-slate-300">/ {documentProxy?.numPages ?? '–'}</span>
       <button class="reader-button" disabled={!documentProxy}>Go</button>
@@ -355,7 +370,8 @@
     <button type="button" class="reader-button" on:click={() => showPage(page + 1)} disabled={!documentProxy || page >= documentProxy.numPages}>Next</button>
     <div class="flex items-center gap-1">
       <button type="button" class="reader-button" aria-label="Zoom out" on:click={() => zoom -= .25} disabled={!documentProxy || zoom <= 1}>−</button>
-      <button type="button" class="reader-button" aria-label="Reset zoom" on:click={() => zoom = 1} disabled={!documentProxy || zoom === 1}>{Math.round(zoom * 100)}%</button>
+      <button type="button" class="reader-button" aria-label={Math.round(zoom * 100) + '% zoom. Reset to 100%.'}
+        on:click={() => zoom = 1} disabled={!documentProxy || zoom === 1}>{Math.round(zoom * 100)}%</button>
       <button type="button" class="reader-button" aria-label="Zoom in" on:click={() => zoom += .25} disabled={!documentProxy || zoom >= 2.5}>+</button>
     </div>
     {#if downloadUrl}
@@ -378,9 +394,7 @@
     <div class="ml-auto flex flex-wrap items-center gap-2">
       <button type="button" class="reader-button min-h-11" aria-haspopup="dialog"
         on:click={openPageText} disabled={readyPage !== page || sendingExcerpt}>Page text</button>
-      <button type="button" class="rounded-lg bg-teal-400 px-3 py-2 text-sm font-semibold text-slate-950 min-h-11
-        hover:bg-teal-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300
-        disabled:bg-slate-800 disabled:text-slate-400"
+      <button type="button" class="ui-button ui-primary"
         on:mousedown|preventDefault on:click={askAboutSelection}
         disabled={readyPage !== page || !!selectionError || sendingExcerpt}>Ask tutor</button>
     </div>
@@ -404,11 +418,10 @@
     </div>
   </div>
 
-  <dialog bind:this={textDialog} aria-labelledby="pdf-text-title"
-    class="m-auto max-h-[90dvh] w-[min(94vw,38rem)] overflow-auto rounded-xl border border-slate-600 bg-slate-900 p-4 text-slate-100 backdrop:bg-slate-950/80">
-    <div class="flex items-center justify-between gap-3">
-      <h2 id="pdf-text-title" class="text-base font-semibold">PDF page {textPage} text</h2>
-      <button type="button" class="reader-button min-h-11" on:click={() => textDialog.close()}>Close</button>
+  <dialog bind:this={textDialog} aria-labelledby="pdf-text-title" class="ui-dialog max-w-[38rem]">
+    <div class="ui-dialog-header">
+      <h2 id="pdf-text-title" class="ui-dialog-title">PDF page {textPage} text</h2>
+      <button type="button" class="ui-button ui-quiet" on:click={() => textDialog.close()}>Close</button>
     </div>
     {#if loadingPageText}
       <p role="status" class="mt-3 text-sm">Loading page text…</p>
@@ -417,9 +430,8 @@
     {:else}
       <p id="pdf-select-help" class="mt-3 text-sm text-slate-300">Select the passage you want to study. You can edit this copy of the page.</p>
       <textarea aria-label="Text from PDF page" aria-describedby="pdf-select-help" bind:this={textField}
-        bind:value={pageText} rows="10" class="my-3 w-full rounded-lg border border-slate-600 bg-slate-950 p-3 text-sm leading-relaxed"></textarea>
-      <button type="button" class="min-h-11 rounded-lg bg-teal-400 px-3 py-2 text-sm font-semibold text-slate-950
-        focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-300"
+        bind:value={pageText} rows="10" class="ui-input my-3"></textarea>
+      <button type="button" class="ui-button ui-primary"
         on:click={askFromPageText}>Use selected text</button>
       {#if textChoiceError}<p role="alert" class="mt-2 text-sm text-amber-200">{textChoiceError}</p>{/if}
     {/if}
@@ -478,6 +490,7 @@
   }
   .reader-button {
     flex-shrink: 0;
+    min-height: 44px;
     border: 1px solid var(--color-slate-700);
     border-radius: .375rem;
     padding: .4rem .55rem;

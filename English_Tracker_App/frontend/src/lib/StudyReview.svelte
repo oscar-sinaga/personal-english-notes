@@ -14,9 +14,10 @@
   let busy = false;
   let error = '';
   let status = '';
+  let heading;
   const controller = new AbortController();
-  const action = 'rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold disabled:opacity-50';
-  const primary = 'rounded-lg bg-teal-400 px-3 py-2 text-xs font-semibold text-slate-950 disabled:opacity-50';
+  const action = 'ui-button';
+  const primary = 'ui-button ui-primary';
 
   function get(path, options = {}) {
     return requestJson('/tutor/' + path, { ...options, signal: controller.signal });
@@ -38,6 +39,7 @@
   }
 
   onMount(() => {
+    heading.focus();
     run(async () => {
       if (mode === 'details') {
         previous = await get('practice/' + entryId);
@@ -82,7 +84,7 @@
 
 <section class="mt-4 space-y-4" aria-label={mode === 'details' ? 'Saved practice' : 'Review practice'}>
   <div class="flex flex-wrap items-center justify-between gap-2">
-    <h3 class="font-semibold">{mode === 'details' ? 'Saved practice' : 'Review practice'}</h3>
+    <h3 class="text-base font-semibold" bind:this={heading} tabindex="-1">{mode === 'details' ? 'Saved practice' : 'Review practice'}</h3>
     <button type="button" class={action} disabled={busy} on:click={back}>Back to journal</button>
   </div>
   {#if error}<p role="alert" class="text-sm text-rose-200">{error}</p>{/if}
@@ -96,9 +98,9 @@
   {:else if card}
     <p class="text-xs text-slate-400">{card.topic_id} · Review {dateLabel(card.due_at)} (WIB)</p>
     <p class="text-sm font-semibold">{card.question}</p>
-    <label class="grid gap-1 text-xs text-slate-300">Recall your answer before looking at the original
+    <label class="ui-label">Recall your answer before looking at the original
       <textarea bind:value={answer} disabled={busy} maxlength="6000" rows="4"
-        class="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-slate-100"></textarea>
+        class="ui-input"></textarea>
     </label>
     {#if !previous}
       <button type="button" class={primary} disabled={busy || !answer.trim()} on:click={reveal}>Reveal previous feedback</button>

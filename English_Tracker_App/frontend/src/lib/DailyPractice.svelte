@@ -156,37 +156,37 @@
   }
 </script>
 
-<section aria-labelledby="daily-title" class="rounded-xl border border-teal-700/60 bg-slate-900 p-4 shadow-xl sm:p-5">
+<section aria-labelledby="daily-title" class="ui-card daily-practice">
   <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-    <h2 id="daily-title" class="text-lg font-semibold text-teal-300" lang="id">Latihan Hari Ini</h2>
+    <h2 id="daily-title" class="text-sm font-semibold text-teal-300">Today’s practice</h2>
     <span class="text-sm text-slate-400">{exercise.skill} · 3–5 min</span>
   </div>
-  <h3 class="mt-3 font-semibold text-white">{exercise.topic}</h3>
+  <h3>{exercise.topic}</h3>
   {#if exercise.skill === 'Reading'}
     <blockquote class="mt-2 border-l-2 border-slate-600 pl-3 text-sm text-slate-300">{exercise.passage}</blockquote>
   {/if}
-  <p class="mt-2 text-sm leading-relaxed text-slate-200">{exercise.instruction}</p>
-  <p class="mt-2 text-sm text-slate-400">{exercise.check}</p>
+  <p class="mt-3 max-w-[62ch] text-base leading-relaxed text-slate-200">{exercise.instruction}</p>
+  <p class="mt-2 max-w-[62ch] text-sm leading-relaxed text-slate-400">{exercise.check}</p>
 
   {#if exercise.skill === 'Listening'}
     {#if englishVoice}
-      <button type="button" class="mt-3 rounded-lg border border-slate-600 px-3 py-2 text-sm disabled:opacity-60" on:click={listen} disabled={listening}>
+      <button type="button" class="ui-button mt-3" on:click={listen} disabled={listening}>
         {listening ? 'Playing…' : 'Play update'}
       </button>
     {:else}
       <p class="mt-3 text-sm text-slate-400">This device has no local English voice. Read the transcript to continue.</p>
     {/if}
-    <details class="mt-3 text-sm text-slate-300">
+    <details class="ui-details mt-2 text-sm text-slate-300">
       <summary class="cursor-pointer">Show transcript</summary>
       <p class="mt-2">{exercise.passage}</p>
     </details>
   {:else if exercise.skill === 'Speaking'}
     {#if recording}
-      <button type="button" class="mt-3 rounded-lg border border-rose-400 px-3 py-2 text-sm text-rose-200" on:click={() => { if (recorder.state === 'recording') recorder.stop(); }}>
+      <button type="button" class="ui-button mt-3" on:click={() => { if (recorder.state === 'recording') recorder.stop(); }}>
         Stop practice recording
       </button>
     {:else}
-      <button type="button" class="mt-3 rounded-lg border border-slate-600 px-3 py-2 text-sm disabled:opacity-60" on:click={record} disabled={requesting}>
+      <button type="button" class="ui-button mt-3" on:click={record} disabled={requesting}>
         {requesting ? 'Waiting for microphone…' : 'Record on this device'}
       </button>
     {/if}
@@ -198,8 +198,8 @@
   {#if status}
     <p role="status" class="mt-2 text-sm text-amber-200">{status}</p>
   {/if}
-  <button type="button" class="mt-4 block rounded-lg bg-teal-400 px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-teal-300 disabled:opacity-60"
+  <button type="button" class="ui-button ui-primary mt-4"
     disabled={requesting || recording} on:click={() => start(exercise, journalPrompt)}>
-    Write in Practice Journal
+    Start today’s practice
   </button>
 </section>

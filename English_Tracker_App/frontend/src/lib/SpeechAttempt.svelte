@@ -205,17 +205,17 @@
 <div class="space-y-2">
   <div class="flex flex-wrap items-center gap-2">
     {#if phase === 'recording'}
-      <button type="button" class="rounded-md bg-rose-600 px-3 py-2 text-xs font-semibold text-white" on:click={stop}>
+      <button type="button" class="ui-button border-rose-400 bg-rose-950 text-rose-100" on:click={stop}>
         Stop recording · {elapsed}s
       </button>
     {:else}
       <button type="button" disabled={disabled || !supported || active} on:click={record}
-        class="rounded-md bg-slate-700 px-3 py-2 text-xs font-semibold disabled:opacity-60">
+        class="ui-button">
         {phase === 'starting' ? 'Opening microphone…' : phase === 'finishing' ? 'Preparing recording…' : audio ? 'Record again' : 'Record answer'}
       </button>
     {/if}
     {#if local === 'downloadable' && typeof recognitionClass?.install === 'function'}
-      <button type="button" class="text-xs text-teal-300 underline" disabled={installing || active || disabled} on:click={installLanguage}>
+      <button type="button" class="ui-button ui-quiet" disabled={installing || active || disabled} on:click={installLanguage}>
         {installing ? 'Installing…' : 'Install on-device English dictation'}
       </button>
     {/if}
@@ -223,16 +223,16 @@
   {#if !supported}<p class="text-xs text-slate-400">Recording is unavailable in this browser. Type or paste a transcript.</p>{/if}
   {#if audioUrl}
     <audio controls preload="metadata" src={audioUrl} class="w-full" aria-label={'Recording for attempt ' + number}></audio>
-    <button type="button" disabled={disabled || active} on:click={() => onChange({ audio: null })} class="text-xs text-slate-300 underline disabled:opacity-50">
+    <button type="button" disabled={disabled || active} on:click={() => onChange({ audio: null })} class="ui-button ui-quiet">
       Remove this recording
     </button>
   {/if}
   {#if message}<p role="status" class="text-xs text-amber-100">{message}</p>{/if}
-  <label class="grid gap-1 text-xs text-slate-300">
+  <label class="ui-label">
     {number === 1 ? 'Answer or transcript' : 'Second answer or transcript'}
     <textarea value={transcript} on:input={event => onChange({ transcript: event.currentTarget.value })}
       maxlength="6000" rows="3" disabled={disabled || active}
-      class="w-full rounded-lg border border-slate-700 bg-slate-950 p-2.5 text-sm text-slate-100"
+      class="ui-input"
       placeholder="Speak, type, or paste your response in English."></textarea>
   </label>
 </div>

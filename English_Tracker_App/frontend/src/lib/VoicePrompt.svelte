@@ -55,14 +55,14 @@
   }
 </script>
 
-<button type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-xs font-medium" on:click={copy}>
+<button type="button" class="ui-button" on:click={copy}>
   Copy prompt for Codex Voice
 </button>
 {#if showPrompt}
   <p role="status" class="basis-full text-xs text-slate-200">Copy the prompt below into a task in the ChatGPT desktop app, then select Start voice chat.</p>
   <label class="grid w-full gap-1 text-xs text-slate-300">Voice practice prompt
     <textarea readonly value={prompt} rows="4"
-      class="w-full rounded-lg border border-slate-700 bg-slate-950 p-2 text-sm text-slate-100"></textarea>
+      class="ui-input"></textarea>
   </label>
 {:else if copied === prompt}
   <p role="status" class="basis-full text-xs text-slate-200">Copied. Paste it into a task in the ChatGPT desktop app, then select Start voice chat.</p>

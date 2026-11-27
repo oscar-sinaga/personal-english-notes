@@ -59,6 +59,10 @@ Gemini remains unavailable until an official Google CLI connection is set up.
 
 ### Guided practice
 
+- Open **Today’s practice** on the dashboard or choose a skill in **Practice
+  Editor**. **Timer options** holds the study duration, stage, and time log
+  controls for the single timer in the navigation. Open **AI Assistant** from
+  the navigation for provider preferences and AI history.
 - In **Read Book**, open **Study reader** if the browser PDF viewer is active.
   Highlight a passage and choose **Ask tutor** to fill in its book, PDF page
   and excerpt. **Page text** lets you select the passage with the keyboard.
@@ -93,3 +97,6 @@ on loopback. Run `tests/browser-guided.mjs` with Playwright 1.65.0 and Chromium
 in the same network namespace. It uses a synthetic microphone stream and
 simulates device voice and dictation availability. `tests/browser-pdf-tutor.mjs`
 checks PDF selection, keyboard controls and the resulting excerpt draft.
+`tests/browser-design.mjs` exercises the dashboard, timer, journal, AI settings,
+and responsive layouts. Set `CHECK_A11Y=1` with `axe-core` installed alongside
+Playwright to include the automated accessibility checks.

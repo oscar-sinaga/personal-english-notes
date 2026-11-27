@@ -61,7 +61,10 @@ try {
   assert.equal(await explain.evaluate(el => document.activeElement === el), true);
   assert.ok((await explain.boundingBox()).height >= 44);
   assert.equal(await desktop.getByRole("region", { name: "Anderson reader" }).isVisible(), true);
-  assert.equal(await desktop.locator('button[aria-label="English AI Assistant"]').isVisible(), false);
+  assert.equal(await button(desktop, "AI Assistant").evaluate(element => getComputedStyle(element.parentElement).position === "fixed"), false);
+  const bookControl = await button(desktop, "Anderson PDF").boundingBox();
+  const headerControl = await button(desktop, "Show header").boundingBox();
+  assert.ok(Math.abs(bookControl.y - headerControl.y) < 12, "Desktop reader controls should fit on one row");
   if (process.env.UX_SCREENSHOTS) {
     await desktop.screenshot({ path: process.env.UX_SCREENSHOTS + "/after-desktop.png" });
   }
@@ -106,7 +109,7 @@ try {
   await text.waitFor();
   await phone.waitForFunction(() => document.activeElement?.getAttribute("aria-label") === "Text from PDF page");
   await phone.keyboard.press("Control+Home");
-  await phone.keyboard.press("Shift+End");
+  for (const _ of andersonQuote) await phone.keyboard.press("Shift+ArrowRight");
   const selection = await text.evaluate(el => el.value.slice(el.selectionStart, el.selectionEnd));
   assert.equal(selection, andersonQuote);
   await phone.keyboard.press("Tab");
@@ -114,7 +117,7 @@ try {
   await phone.keyboard.press("Enter");
   await checkExcerpt(phone, "anderson", 2, andersonQuote);
   assert.equal(await phone.getByRole("region", { name: "Anderson reader" }).isVisible(), false);
-  assert.equal(await phone.locator('button[aria-label="English AI Assistant"]').isVisible(), false);
+  assert.equal(await button(phone, "AI Assistant").evaluate(element => element.closest("nav") !== null), true);
   assert.equal(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   if (process.env.UX_SCREENSHOTS) {
     await phone.screenshot({ path: process.env.UX_SCREENSHOTS + "/after-phone.png" });
