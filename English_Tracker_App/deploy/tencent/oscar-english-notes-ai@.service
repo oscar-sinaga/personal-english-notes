@@ -1,0 +1,23 @@
+[Unit]
+Description=Subscription inference for English Notes
+
+[Service]
+Type=exec
+User=oscar-sinaga
+ExecStart=/usr/bin/python3 /srv/oscar/job-ai-automaton/source/deploy/tencent-ai/runner.py
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+PrivateTmp=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=-/home/oscar-sinaga/.codex -/home/oscar-sinaga/.claude
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+UMask=0077
+Slice=oscar-job-ai.slice
+OOMScoreAdjust=300
+TasksMax=48
+RuntimeMaxSec=100

@@ -61,6 +61,15 @@
   let savingPractice = false;
   let showPracticeJournal = false;
   let aiEnabled = false;
+  let transcriptionEnabled = false;
+  let subscriptionAI = false;
+  let showAISettings = false;
+  let aiSettingsBusy = false;
+  let aiSettingsStatus = '';
+  let aiProvider = 'codex';
+  let aiModel = '';
+  let aiModels = [];
+  let activeAI = null;
   let onlineHelpers = false;
   let books = null;
   let exportStatus = "";
@@ -136,6 +145,8 @@
     fetchWeeklyStats();
     requestJson('/config').then(config => {
       aiEnabled = config.ai_enabled;
+      transcriptionEnabled = config.transcription_enabled ?? config.ai_enabled;
+      subscriptionAI = config.subscription_ai ?? false;
       onlineHelpers = config.online_helpers;
       books = config.books;
     }).catch(() => { books = { anderson: false, siddiqi: false }; });
@@ -546,7 +557,7 @@
     const items = e.clipboardData?.items;
     if (!items) return;
     for (const item of items) {
-      if (item.type.startsWith('image/')) {
+      if (!subscriptionAI && item.type.startsWith('image/')) {
         const file = item.getAsFile();
         const reader = new FileReader();
         reader.onload = () => {
@@ -577,6 +588,7 @@
         body: JSON.stringify({ text: textToSend, image_base64: doubtImageBase64 })
       });
       
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.detail || 'Could not explain this text.');
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       
@@ -607,10 +619,43 @@
       setTimeout(() => { doubtStatus = "" }, 3000);
     } catch (e) {
       console.error(e);
-      doubtStatus = "Magic failed.";
+      doubtStatus = e.message || "Could not explain this text.";
       setTimeout(() => { doubtStatus = "" }, 3000);
     } finally {
       isExplaining = false;
+    }
+  }
+
+  async function loadAISettings(provider) {
+    aiSettingsBusy = true;
+    aiSettingsStatus = '';
+    try {
+      const info = await requestJson('/ai/preferences' + (provider ? '?provider=' + provider : ''));
+      activeAI = info.active;
+      aiProvider = provider || activeAI.provider;
+      aiModels = info.models;
+      aiModel = aiProvider === activeAI.provider ? activeAI.model : aiModels[0];
+    } catch (error) {
+      aiSettingsStatus = error.message;
+    } finally {
+      aiSettingsBusy = false;
+    }
+  }
+
+  async function saveAISettings() {
+    aiSettingsBusy = true;
+    aiSettingsStatus = '';
+    try {
+      activeAI = await requestJson('/ai/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: aiProvider, model: aiModel }),
+      });
+      aiSettingsStatus = 'AI preferences saved.';
+    } catch (error) {
+      aiSettingsStatus = error.message;
+    } finally {
+      aiSettingsBusy = false;
     }
   }
 
@@ -621,7 +666,7 @@
   }
 
   async function sendChatMessage() {
-    if (!chatInput.trim() || isChatLoading) return;
+    if (!aiEnabled || !chatInput.trim() || isChatLoading) return;
     
     const userMsg = { role: "user", content: chatInput.trim() };
     chatMessages = [...chatMessages, userMsg];
@@ -639,7 +684,7 @@
       });
       
       if (!res.ok) {
-        throw new Error(`Server returned ${res.status}`);
+        throw new Error((await res.json().catch(() => null))?.detail || `Server returned ${res.status}`);
       }
       
       const reader = res.body.getReader();
@@ -1214,7 +1259,7 @@
                 🤖 Check Grammar
               {/if}
             </button>
-            <button class="px-3 py-2 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 {isRecording ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}" on:click={toggleRecording} disabled={!aiEnabled || isTranscribing || isCheckingGrammar}>
+            <button class="px-3 py-2 rounded-lg font-bold transition-colors cursor-pointer flex items-center gap-1 disabled:opacity-50 {isRecording ? 'bg-red-600 hover:bg-red-500 text-white animate-pulse' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}" on:click={toggleRecording} disabled={!transcriptionEnabled || isTranscribing || isCheckingGrammar}>
               {#if isTranscribing}
                 <svg class="animate-spin h-3 w-3 text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 Transcribing...
@@ -1417,7 +1462,7 @@
             <h3 class="text-xs font-bold text-amber-400 mb-2">❓ Confusing Concept / Grammar</h3>
             <p class="text-[10px] text-slate-400 mb-3 leading-relaxed">Paste complex English grammar or confusing risk concepts here to be reviewed by AI IDE later.</p>
             
-            <textarea bind:value={doubtContent} on:paste={handlePaste} class="flex-1 w-full min-h-[150px] bg-slate-950 border border-slate-800 text-xs text-slate-300 px-2 py-2 rounded focus:border-amber-500 outline-none resize-none mb-3 custom-scrollbar" placeholder="Paste confusing sentence from the book here... (Or Ctrl+V to paste an image screenshot!)"></textarea>
+            <textarea bind:value={doubtContent} on:paste={handlePaste} class="flex-1 w-full min-h-[150px] bg-slate-950 border border-slate-800 text-xs text-slate-300 px-2 py-2 rounded focus:border-amber-500 outline-none resize-none mb-3 custom-scrollbar" placeholder={subscriptionAI ? "Paste a sentence from the book…" : "Paste a sentence or an image from the book…"}></textarea>
             
             {#if doubtImageBase64}
               <div class="relative inline-block mb-3 bg-slate-900 border border-slate-700 p-1 rounded max-w-fit">
@@ -1578,6 +1623,12 @@
           <span class="font-bold text-slate-200 text-sm">English AI Assistant</span>
         </div>
         <div class="flex items-center gap-3">
+          {#if subscriptionAI}
+            <button type="button" class="text-xs text-teal-300" on:click={() => {
+              showAISettings = !showAISettings;
+              if (showAISettings) loadAISettings();
+            }}>AI settings</button>
+          {/if}
           <button class="text-slate-400 hover:text-white transition-colors cursor-pointer" on:click={() => isChatMaximized = !isChatMaximized} title={isChatMaximized ? "Minimize" : "Maximize"}>
             {#if isChatMaximized}
               <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 14h6v6m10-10h-6V4m0 10l6 6M4 4l6 6" /></svg>
@@ -1591,6 +1642,32 @@
         </div>
       </div>
       
+      {#if showAISettings && subscriptionAI}
+        <form class="space-y-2 border-b border-slate-700 p-3 text-xs text-slate-200" on:submit|preventDefault={saveAISettings}>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="min-w-0">AI provider
+              <select aria-label="AI provider" class="mt-1 w-full rounded bg-slate-800 p-2" bind:value={aiProvider}
+                on:change={() => loadAISettings(aiProvider)} disabled={aiSettingsBusy}>
+                <option value="codex">Codex</option>
+                <option value="claude">Claude Code</option>
+                <option value="gemini" disabled>Gemini · setup pending</option>
+              </select>
+            </label>
+            <label class="min-w-0">AI model
+              <select aria-label="AI model" class="mt-1 w-full rounded bg-slate-800 p-2" bind:value={aiModel} disabled={aiSettingsBusy}>
+                {#each aiModels as model (model)}
+                  <option value={model}>{model}</option>
+                {/each}
+              </select>
+            </label>
+          </div>
+          {#if activeAI}<p class="text-slate-400">Active model {activeAI.model}</p>{/if}
+          <button type="submit" class="rounded bg-teal-400 px-3 py-1.5 font-semibold text-slate-950 disabled:opacity-50"
+            disabled={aiSettingsBusy || !aiModel}>Save AI preferences</button>
+          {#if aiSettingsStatus}<p role="status">{aiSettingsStatus}</p>{/if}
+        </form>
+      {/if}
+
       <!-- Messages -->
       <div class="flex-1 overflow-y-auto p-4 flex flex-col gap-4 custom-scrollbar bg-slate-950" bind:this={chatContainer}>
         {#if chatMessages.length === 0}
@@ -1631,12 +1708,12 @@
             bind:value={chatInput} 
             placeholder="Ask something..." 
             class="flex-1 bg-slate-800 text-slate-200 text-sm rounded-xl px-4 py-2 border border-slate-700 focus:border-teal-500 focus:outline-none placeholder-slate-500 disabled:opacity-50"
-            disabled={isChatLoading}
+            disabled={!aiEnabled || isChatLoading}
           >
           <button 
             type="submit" 
             class="bg-teal-500 hover:bg-teal-400 text-slate-950 p-2.5 rounded-xl cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shrink-0"
-            disabled={!chatInput.trim() || isChatLoading}
+            disabled={!aiEnabled || !chatInput.trim() || isChatLoading}
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
           </button>

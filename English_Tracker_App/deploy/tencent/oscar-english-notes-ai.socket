@@ -1,0 +1,13 @@
+[Unit]
+Description=Private subscription AI socket for English Notes
+
+[Socket]
+ListenStream=/srv/oscar/workspaces/english-notes/state/.ai/provider.sock
+SocketMode=0660
+SocketGroup=oscar-job-ai
+Accept=yes
+MaxConnections=2
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target
